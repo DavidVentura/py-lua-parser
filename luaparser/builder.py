@@ -106,12 +106,6 @@ class Tokens(enum.Enum):
     NEWLINE = enum.auto()
     SHEBANG = enum.auto()
     LongBracket = enum.auto()
-    BTN_X = enum.auto()
-    BTN_O = enum.auto()
-    BTN_ARR_UP = enum.auto()
-    BTN_ARR_DOWN = enum.auto()
-    BTN_ARR_LEFT = enum.auto()
-    BTN_ARR_RIGHT = enum.auto()
 
 
 LITERAL_NAMES = [
@@ -183,12 +177,6 @@ LITERAL_NAMES = [
     "NEWLINE",
     "SHEBANG",
     "LONG_BRACKET",
-    "BTN_X",
-    "BTN_O",
-    "BTN_ARR_UP",
-    "BTN_ARR_DOWN",
-    "BTN_ARR_LEFT",
-    "BTN_ARR_RIGHT",
 ]
 
 
@@ -359,7 +347,7 @@ class Builder:
         if tokens:
             for t in tokens:
                 if not self._hidden_handled:
-                    if t.type == Tokens.LINE_COMMENT:
+                    if t.type == Tokens.LINE_COMMENT.value:
                         self.comments.append(
                             Comment(
                                 t.text,
@@ -367,7 +355,7 @@ class Builder:
                                 last_token=t,
                             )
                         )
-                    elif t.type == Tokens.COMMENT:
+                    elif t.type == Tokens.COMMENT.value:
                         self.comments.append(
                             Comment(
                                 t.text,
@@ -376,7 +364,7 @@ class Builder:
                                 last_token=t,
                             )
                         )
-                    elif t.type == Tokens.NEWLINE:
+                    elif t.type == Tokens.NEWLINE.value:
                         # append n time a None value (indicate newline)
                         self.comments += t.text.count("\n") * [None]
 
@@ -387,7 +375,7 @@ class Builder:
         if tokens:
             for t in tokens:
                 if not self._hidden_handled:
-                    if t.type == Tokens.LINE_COMMENT:
+                    if t.type == Tokens.LINE_COMMENT.value:
                         self.comments.append(
                             Comment(
                                 t.text,
@@ -395,7 +383,7 @@ class Builder:
                                 last_token=t,
                             )
                         )
-                    elif t.type == Tokens.COMMENT:
+                    elif t.type == Tokens.COMMENT.value:
                         self.comments.append(
                             Comment(
                                 t.text,
@@ -404,7 +392,7 @@ class Builder:
                                 last_token=t,
                             )
                         )
-                    elif t.type == Tokens.NEWLINE:
+                    elif t.type == Tokens.NEWLINE.value:
                         # append n time a None value (indicate newline)
                         self.comments += t.text.count("\n") * [None]
 
@@ -455,7 +443,7 @@ class Builder:
         token = self._stream.LT(2)
         expected = set(self._expected)
         for type_to_seek in expected:
-            types_str.append(LITERAL_NAMES[type_to_seek.value])
+            types_str.append(LITERAL_NAMES[type_to_seek])
 
         raise SyntaxException(
             "Expecting one of "
@@ -553,17 +541,13 @@ class Builder:
 
     def parse_inplace_op(self) -> Assign or bool:
         self.save()
-        if not self.next_is_rc(Tokens.NAME):
+        names = self.parse_names()
+        if not names:
             return self.failure()
-
-        name = Name(
-                self.text,
-                first_token=self._LT,
-                last_token=self._LT,
-            )
 
         if not self.next_in_rc([Tokens.IADD, Tokens.ISUB, Tokens.IMUL, Tokens.IDIV]):
             return self.failure()
+
         op = self.type
         if op == Tokens.IADD.value:
             iop = InplaceOp.ADD
@@ -575,7 +559,8 @@ class Builder:
             iop = InplaceOp.DIV
         value = self.parse_expr()
 
-        return IAssign(name, value, iop)
+        self.success()
+        return IAssign(names, value, iop)
 
     def parse_assignment(self) -> Assign or bool:
         self.save()
@@ -732,7 +717,7 @@ class Builder:
             tokens = self._stream.getHiddenTokensToLeft(self._stream.index)
             if tokens:
                 for t in tokens:
-                    if t.type == Tokens.NEWLINE and not self.prev_is(Tokens.SEMCOL):
+                    if t.type == Tokens.NEWLINE.value and not self.prev_is(Tokens.SEMCOL):
                         raise SyntaxException(
                             "Ambiguous syntax detected", self._stream.LT(-1)
                         )
@@ -1457,6 +1442,7 @@ class Builder:
                 first_token=self._LT,
                 last_token=self._LT,
             )
+
 
         if self.next_is(Tokens.STRING) and self.next_is_rc(Tokens.STRING):
             string = self.parse_lua_str(self.text, self._LT)

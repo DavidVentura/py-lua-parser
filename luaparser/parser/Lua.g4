@@ -76,7 +76,7 @@ assignment
   ;
 
 inplace_op
-  : NAME (IADD | ISUB | IMUL | IDIV) expr
+  : names (IADD | ISUB | IMUL | IDIV) expr
   ;
 
 local
@@ -188,7 +188,6 @@ atom
   | NIL
   | TRUE
   | FALSE
-  | BUTTON
   ;
 
 var[bool assign]
@@ -309,11 +308,6 @@ SEMCOL    : ';';
 
 NAME
   : (Letter | '_') (Letter | '_' | Digit)*
-  ;
-
-BUTTON
-  : (Digit+ ('.' Digit*)? Exponent? | '.' Digit+ Exponent?)
-  | '0' ('x' | 'X') HexDigits ('.' HexDigits?)? BinaryExponent?
   ;
 
 NUMBER

@@ -4,13 +4,29 @@
 
     Contains all Ast Node definitions.
 """
-from enum import Enum
+import textwrap
+from enum import Enum, auto
 from typing import List, Optional
 
 from antlr4.Token import CommonToken
 
 Comments = Optional[List["Comment"]]
+NEWLINE = '\n'
 
+class InplaceOp(Enum):
+    ADD      = auto()
+    SUB      = auto()
+    MUL      = auto()
+    DIV      = auto()
+
+class Type(Enum):
+    NUMBER   = auto()
+    STRING   = auto()
+    BOOL     = auto()
+    FUNCTION = auto()
+    NULL     = auto()
+    TABLE    = auto()
+    UNKNOWN  = auto()
 
 def _equal_dicts(d1, d2, ignore_keys):
     ignored = set(ignore_keys)
@@ -26,12 +42,16 @@ def _equal_dicts(d1, d2, ignore_keys):
 class Node:
     """Base class for AST node."""
 
+    def dump(self):
+        raise NotImplementedError(f'dump is not implemented for {type(self)}')
+
     def __init__(
         self,
         name: str,
         comments: Comments = None,
         first_token: Optional[CommonToken] = None,
         last_token: Optional[CommonToken] = None,
+        parent: Optional['Node'] = None,
     ):
         """
 
@@ -47,6 +67,7 @@ class Node:
         self.comments: Comments = comments
         self._first_token: Optional[CommonToken] = first_token
         self._last_token: Optional[CommonToken] = last_token
+        self.parent = parent
 
         # We want to have nodes be serializable with pickle.
         # To allow that we must not have mutable fields such as streams.
@@ -136,13 +157,24 @@ class Comment(Node):
         self.s: str = s
         self.is_multi_line: bool = is_multi_line
 
+    def dump(self):
+        pass
+
 
 class Statement(Node):
     """Base class for Lua statement."""
 
+    def dump(self):
+        pass
+
 
 class Expression(Node):
     """Define a Lua expression."""
+    pass
+
+    def dump(self):
+        pass
+
 
 
 class Block(Node):
@@ -151,6 +183,11 @@ class Block(Node):
     def __init__(self, body: List[Statement], **kwargs):
         super().__init__("Block", **kwargs)
         self.body: List[Statement] = body
+        for s in body:
+            s.parent = self
+
+    def dump(self):
+        return '\n'.join(s.dump() for s in self.body)
 
 
 class Chunk(Node):
@@ -163,6 +200,10 @@ class Chunk(Node):
     def __init__(self, body: Block, **kwargs):
         super(Chunk, self).__init__("Chunk", **kwargs)
         self.body = body
+        body.parent = self
+
+    def dump(self):
+        pass
 
 
 """
@@ -172,6 +213,9 @@ Left Hand Side expression.
 
 class Lhs(Expression):
     """Define a Lua Left Hand Side expression."""
+
+    def dump(self):
+        return super().dump()
 
 
 class Name(Lhs):
@@ -185,10 +229,16 @@ class Name(Lhs):
         super(Name, self).__init__("Name", **kwargs)
         self.id: str = identifier
 
+    def dump(self):
+        return self.id
+
 
 class IndexNotation(Enum):
     DOT = 0  # obj.foo
     SQUARE = 1  # obj[foo]
+
+    def dump(self):
+        return super().dump()
 
 
 class Index(Lhs):
@@ -210,7 +260,15 @@ class Index(Lhs):
         self.idx: Name = idx
         self.value: Expression = value
         self.notation: IndexNotation = notation
+        self.id = idx.id
 
+
+    def dump(self):
+        if self.notation == IndexNotation.DOT:
+            return f'{self.value.dump()}["{self.idx.dump()}"]'
+        if isinstance(self.idx, String):
+            return f'{self.value.dump()}["{self.idx.dump()}"]'
+        return f'{self.value.dump()}[{self.idx.dump()}]'
 
 """ ----------------------------------------------------------------------- """
 """ Statements                                                              """
@@ -230,6 +288,69 @@ class Assign(Statement):
         super().__init__("Assign", **kwargs)
         self.targets: List[Node] = targets
         self.values: List[Node] = values
+        # TODO: actually go up to chunk
+        # look up for variables with name T and assign their type there
+        # so that other things like `AddOp` can do the same
+        # and emit `+` for known types
+        self.type = Type.UNKNOWN
+
+        assert len(self.targets) == 1
+        assert len(self.values) == 1
+        t = self.targets[0]
+        v = self.values[0]
+
+        if isinstance(v, Number):
+            self.type = Type.NUMBER
+        if isinstance(v, String):
+            self.type = Type.STRING
+        if isinstance(v, TrueExpr):
+            self.type = Type.BOOL
+        if isinstance(v, FalseExpr):
+            self.type = Type.BOOL
+        if isinstance(v, Table):
+            self.type = Type.TABLE
+
+    def dump(self):
+        # TODO: multi assign
+        assert len(self.targets) == 1
+        assert len(self.values) == 1
+        t = self.targets[0]
+        v = self.values[0]
+        
+        if self.type == Type.NUMBER:
+            r = f'{t.dump()} = TVfromnumber({v.dump()});'
+        elif self.type == Type.STRING:
+            r = f'{t.dump()} = TVfromstr({v.dump()});'
+        elif self.type == Type.STRING:
+            r = f'{t.dump()} = TVfromstr({v.dump()});'
+        elif self.type == Type.BOOL:
+            r = f'{t.dump()} = TVfromnumber({v.dump()}); // bool'
+        elif self.type == Type.UNKNOWN:
+            r = f'{t.dump()} = {v.dump()}; // unknown'
+        elif self.type == Type.TABLE:
+            r = f'std::unordered_map<std::string, TValue>{t.id} = {v.dump()};'
+        else:
+            raise ValueError(f'Assignment on type {self.type} unsupported')
+        return r
+
+class IAssign(Statement):
+    def __init__(self, target: Node, value: Node, op: Expression, **kwargs):
+        super().__init__("IAssign", **kwargs)
+        self.target: Node = target
+        self.value: Node = value
+        self.op: Expression = op
+
+        self.target.parent = self
+        self.value.parent = self
+
+    def dump(self):
+        _map = {InplaceOp.ADD:  '+=',
+                InplaceOp.SUB:  '-=',
+                InplaceOp.MUL: '*=',
+                InplaceOp.DIV:  '/=',
+                }
+        return f'{self.target.dump()} {_map[self.op]} {self.value.dump()};'
+
 
 
 class LocalAssign(Assign):
@@ -244,6 +365,9 @@ class LocalAssign(Assign):
         super().__init__(targets, values, **kwargs)
         self._name: str = "LocalAssign"
 
+    def dump(self):
+        return super().dump()
+
 
 class While(Statement):
     """Lua while statement.
@@ -257,6 +381,11 @@ class While(Statement):
         super().__init__("While", **kwargs)
         self.test: Expression = test
         self.body: Block = body
+        self.test.parent = self
+        self.body.parent = self
+
+    def dump(self):
+        return super().dump()
 
 
 class Do(Statement):
@@ -269,6 +398,10 @@ class Do(Statement):
     def __init__(self, body: Block, **kwargs):
         super().__init__("Do", **kwargs)
         self.body: Block = body
+        self.body.parent = self
+
+    def dump(self):
+        return super().dump()
 
 
 class Repeat(Statement):
@@ -283,6 +416,11 @@ class Repeat(Statement):
         super().__init__("Repeat", **kwargs)
         self.body: Block = body
         self.test: Expression = test
+        self.body.parent = self
+        self.test.parent = self
+
+    def dump(self):
+        return super().dump()
 
 
 class ElseIf(Statement):
@@ -299,6 +437,14 @@ class ElseIf(Statement):
         self.test: Node = test
         self.body: Block = body
         self.orelse = orelse
+
+        self.test.parent = self
+        self.body.parent = self
+        if orelse:
+            self.orelse.parent = self
+
+    def dump(self):
+        return super().dump()
 
 
 class If(Statement):
@@ -318,6 +464,29 @@ class If(Statement):
         self.body: Block = body
         self.orelse = orelse
 
+        self.test.parent = self
+        self.body.parent = self
+        if orelse:
+            self.orelse.parent = self
+
+    def dump(self):
+        cond_arm = f'''
+        if ({self.test.dump()}) {{
+        {self.body.dump()}
+        }}'''
+        if isinstance(self.orelse, ElseIf):
+            else_arm = f'''else if ({self.orelse.test.dump()}) {{
+            {self.orelse.body.dump()}
+            }}
+            '''
+        else:
+            # no else arm
+            if self.orelse is None or len(self.orelse) == 0:
+                else_arm = ''
+            else:
+                else_arm = '\n'.join(s.dump() for s in self.orelse)
+        return cond_arm + else_arm
+
 
 class Label(Statement):
     """Define the label lua statement.
@@ -329,6 +498,9 @@ class Label(Statement):
     def __init__(self, label_id: Name, **kwargs):
         super(Label, self).__init__("Label", **kwargs)
         self.id: Name = label_id
+
+    def dump(self):
+        return super().dump()
 
 
 class Goto(Statement):
@@ -342,6 +514,9 @@ class Goto(Statement):
         super(Goto, self).__init__("Goto", **kwargs)
         self.label: Name = label
 
+    def dump(self):
+        return super().dump()
+
 
 class SemiColon(Statement):
     """Define the semi-colon lua statement."""
@@ -349,12 +524,18 @@ class SemiColon(Statement):
     def __init__(self, **kwargs):
         super(SemiColon, self).__init__("SemiColon", **kwargs)
 
+    def dump(self):
+        return super().dump()
+
 
 class Break(Statement):
     """Define the break lua statement."""
 
     def __init__(self, **kwargs):
         super(Break, self).__init__("Break", **kwargs)
+
+    def dump(self):
+        return super().dump()
 
 
 class Return(Statement):
@@ -367,6 +548,10 @@ class Return(Statement):
     def __init__(self, values, **kwargs):
         super(Return, self).__init__("Return", **kwargs)
         self.values = values
+        self.values.parent = self
+
+    def dump(self):
+        return super().dump()
 
 
 class Fornum(Statement):
@@ -396,6 +581,15 @@ class Fornum(Statement):
         self.step: Expression = step
         self.body: Block = body
 
+        self.target.parent = self
+        self.start.parent = self
+        self.stop.parent = self
+        self.step.parent = self
+        self.body.parent = self
+
+    def dump(self):
+        return super().dump()
+
 
 class Forin(Statement):
     """Define the for in lua statement.
@@ -414,6 +608,15 @@ class Forin(Statement):
         self.iter: List[Expression] = iter
         self.targets: List[Name] = targets
 
+        self.body.parent = self
+        for i in self.iter:
+            i.parent = self
+        for t in self.targets:
+            t.parent = self
+
+    def dump(self):
+        return super().dump()
+
 
 class Call(Statement):
     """Define the function call lua statement.
@@ -427,6 +630,17 @@ class Call(Statement):
         super(Call, self).__init__("Call", **kwargs)
         self.func: Expression = func
         self.args: List[Expression] = args
+
+        if func:
+            self.func.parent = self
+        for a in self.args:
+            a.parent = self
+
+    def dump(self):
+        r = f'''{self.func.id}({", ".join(a.dump() for a in self.args)})'''
+        if isinstance(self.parent, Block):
+            r += ';'
+        return r
 
 
 class Invoke(Statement):
@@ -446,6 +660,9 @@ class Invoke(Statement):
         self.func: Expression = func
         self.args: List[Expression] = args
 
+    def dump(self):
+        return super().dump()
+
 
 class Function(Statement):
     """Define the Lua function declaration statement.
@@ -462,8 +679,15 @@ class Function(Statement):
         self.args: List[Expression] = args
         self.body: Block = body
 
+    def dump(self):
+        return textwrap.dedent(f'''
+        TValue* {self.name.id}({" ".join(a.dump() for a in self.args)}) {{
+            {NEWLINE.join(s.dump() for s in self.body.body)}
+            return NULL;
+        }}''')
 
-class LocalFunction(Statement):
+
+class LocalFunction(Function):
     """Define the Lua local function declaration statement.
 
     Attributes:
@@ -477,6 +701,9 @@ class LocalFunction(Statement):
         self.name: Expression = name
         self.args: List[Expression] = args
         self.body: Block = body
+
+    def dump(self):
+        return super().dump()
 
 
 class Method(Statement):
@@ -503,6 +730,9 @@ class Method(Statement):
         self.args: List[Expression] = args
         self.body: Block = body
 
+    def dump(self):
+        return super().dump()
+
 
 """ ----------------------------------------------------------------------- """
 """ Lua Expression                                                          """
@@ -519,6 +749,9 @@ class Nil(Expression):
     def __init__(self, **kwargs):
         super(Nil, self).__init__("Nil", **kwargs)
 
+    def dump(self):
+        return super().dump()
+
 
 class TrueExpr(Expression):
     """Define the Lua true expression."""
@@ -526,12 +759,18 @@ class TrueExpr(Expression):
     def __init__(self, **kwargs):
         super(TrueExpr, self).__init__("True", **kwargs)
 
+    def dump(self):
+        return 'true'
+
 
 class FalseExpr(Expression):
     """Define the Lua false expression."""
 
     def __init__(self, **kwargs):
         super(FalseExpr, self).__init__("False", **kwargs)
+
+    def dump(self):
+        return 'false'
 
 
 NumberType = int or float
@@ -548,12 +787,18 @@ class Number(Expression):
         super(Number, self).__init__("Number", **kwargs)
         self.n: NumberType = n
 
+    def dump(self):
+        return str(self.n)
+
 
 class Varargs(Expression):
     """Define the Lua Varargs expression (...)."""
 
     def __init__(self, **kwargs):
         super(Varargs, self).__init__("Varargs", **kwargs)
+
+    def dump(self):
+        return super().dump()
 
 
 class StringDelimiter(Enum):
@@ -580,6 +825,9 @@ class String(Expression):
         self.s: str = s
         self.delimiter: StringDelimiter = delimiter
 
+    def dump(self):
+        return f'"{self.s}"'
+
 
 class Field(Expression):
     """Define a lua table field expression
@@ -601,6 +849,9 @@ class Field(Expression):
         self.value: Expression = value
         self.between_brackets: bool = between_brackets
 
+    def dump(self):
+        return f'{{ "{self.key.dump()}", {self.value.dump()} }}'
+
 
 class Table(Expression):
     """Define the Lua table expression.
@@ -614,11 +865,20 @@ class Table(Expression):
         self.fields: List[Field] = fields
 
 
+    def dump(self):
+        if self.fields:
+            return f'{{ {", ".join(f.dump() for f in self.fields)} }}'
+        return '{}'
+
+
 class Dots(Expression):
     """Define the Lua dots (...) expression."""
 
     def __init__(self, **kwargs):
         super().__init__("Dots", **kwargs)
+
+    def dump(self):
+        return super().dump()
 
 
 class AnonymousFunction(Expression):
@@ -633,6 +893,9 @@ class AnonymousFunction(Expression):
         super(AnonymousFunction, self).__init__("AnonymousFunction", **kwargs)
         self.args: List[Expression] = args
         self.body: Block = body
+
+    def dump(self):
+        return super().dump()
 
 
 """ ----------------------------------------------------------------------- """
@@ -657,6 +920,9 @@ class BinaryOp(Op):
         self.left: Expression = left
         self.right: Expression = right
 
+    def dump(self):
+        return super().dump()
+
 
 """ ----------------------------------------------------------------------- """
 """ 3.4.1 – Arithmetic Operators                                            """
@@ -678,6 +944,9 @@ class AddOp(AriOp):
     def __init__(self, left: Expression, right: Expression, **kwargs):
         super().__init__("AddOp", left, right, **kwargs)
 
+    def dump(self):
+        return f'_add({self.left.dump()}, {self.right.dump()})'
+
 
 class SubOp(AriOp):
     """Substract expression.
@@ -689,6 +958,9 @@ class SubOp(AriOp):
 
     def __init__(self, left: Expression, right: Expression, **kwargs):
         super().__init__("SubOp", left, right, **kwargs)
+
+    def dump(self):
+        return f'_sub({self.left.dump()}, {self.right.dump()})'
 
 
 class MultOp(AriOp):
@@ -702,6 +974,9 @@ class MultOp(AriOp):
     def __init__(self, left: Expression, right: Expression, **kwargs):
         super().__init__("MultOp", left, right, **kwargs)
 
+    def dump(self):
+        return f'_mult({self.left.dump()}, {self.right.dump()})'
+
 
 class FloatDivOp(AriOp):
     """Float division expression.
@@ -713,6 +988,9 @@ class FloatDivOp(AriOp):
 
     def __init__(self, left: Expression, right: Expression, **kwargs):
         super().__init__("FloatDivOp", left, right, **kwargs)
+
+    def dump(self):
+        return super().dump()
 
 
 class FloorDivOp(AriOp):
@@ -726,6 +1004,9 @@ class FloorDivOp(AriOp):
     def __init__(self, left: Expression, right: Expression, **kwargs):
         super().__init__("FloorDivOp", left, right, **kwargs)
 
+    def dump(self):
+        return super().dump()
+
 
 class ModOp(AriOp):
     """Modulo expression.
@@ -738,6 +1019,9 @@ class ModOp(AriOp):
     def __init__(self, left: Expression, right: Expression, **kwargs):
         super().__init__("ModOp", left, right, **kwargs)
 
+    def dump(self):
+        return f'{self.left.dump()} % {self.right.dump()}'
+
 
 class ExpoOp(AriOp):
     """Exponent expression.
@@ -749,6 +1033,9 @@ class ExpoOp(AriOp):
 
     def __init__(self, left: Expression, right: Expression, **kwargs):
         super().__init__("ExpoOp", left, right, **kwargs)
+
+    def dump(self):
+        return super().dump()
 
 
 """ ----------------------------------------------------------------------- """
@@ -771,6 +1058,9 @@ class BAndOp(BitOp):
     def __init__(self, left: Expression, right: Expression, **kwargs):
         super().__init__("BAndOp", left, right, **kwargs)
 
+    def dump(self):
+        return super().dump()
+
 
 class BOrOp(BitOp):
     """Bitwise or expression.
@@ -782,6 +1072,9 @@ class BOrOp(BitOp):
 
     def __init__(self, left: Expression, right: Expression, **kwargs):
         super().__init__("BOrOp", left, right, **kwargs)
+
+    def dump(self):
+        return super().dump()
 
 
 class BXorOp(BitOp):
@@ -795,6 +1088,9 @@ class BXorOp(BitOp):
     def __init__(self, left: Expression, right: Expression, **kwargs):
         super().__init__("BXorOp", left, right, **kwargs)
 
+    def dump(self):
+        return super().dump()
+
 
 class BShiftROp(BitOp):
     """Bitwise right shift expression.
@@ -806,6 +1102,9 @@ class BShiftROp(BitOp):
 
     def __init__(self, left: Expression, right: Expression, **kwargs):
         super().__init__("BShiftROp", left, right, **kwargs)
+
+    def dump(self):
+        return super().dump()
 
 
 class BShiftLOp(BitOp):
@@ -819,6 +1118,9 @@ class BShiftLOp(BitOp):
     def __init__(self, left: Expression, right: Expression, **kwargs):
         super().__init__("BShiftLOp", left, right, **kwargs)
 
+    def dump(self):
+        return super().dump()
+
 
 """ ----------------------------------------------------------------------- """
 """ 3.4.4 – Relational Operators                                            """
@@ -827,6 +1129,8 @@ class BShiftLOp(BitOp):
 
 class RelOp(BinaryOp):
     """Base class for Lua relational operators."""
+    def dump(self):
+        return f'({self.left.dump()} {self.OP} {self.right.dump()})'
 
 
 class LessThanOp(RelOp):
@@ -836,9 +1140,13 @@ class LessThanOp(RelOp):
         left (`Expression`): Left expression.
         right (`Expression`): Right expression.
     """
+    OP = '<'
 
     def __init__(self, left: Expression, right: Expression, **kwargs):
         super().__init__("RLtOp", left, right, **kwargs)
+
+    def dump(self):
+        return super().dump()
 
 
 class GreaterThanOp(RelOp):
@@ -848,9 +1156,13 @@ class GreaterThanOp(RelOp):
         left (`Expression`): Left expression.
         right (`Expression`): Right expression.
     """
+    OP = '>'
 
     def __init__(self, left: Expression, right: Expression, **kwargs):
         super().__init__("RGtOp", left, right, **kwargs)
+
+    def dump(self):
+        return super().dump()
 
 
 class LessOrEqThanOp(RelOp):
@@ -860,9 +1172,13 @@ class LessOrEqThanOp(RelOp):
         left (`Expression`): Left expression.
         right (`Expression`): Right expression.
     """
+    OP = '<='
 
     def __init__(self, left: Expression, right: Expression, **kwargs):
         super().__init__("RLtEqOp", left, right, **kwargs)
+
+    def dump(self):
+        return super().dump()
 
 
 class GreaterOrEqThanOp(RelOp):
@@ -872,9 +1188,13 @@ class GreaterOrEqThanOp(RelOp):
         left (`Expression`): Left expression.
         right (`Expression`): Right expression.
     """
+    OP = '>='
 
     def __init__(self, left: Expression, right: Expression, **kwargs):
         super().__init__("RGtEqOp", left, right, **kwargs)
+
+    def dump(self):
+        return super().dump()
 
 
 class EqToOp(RelOp):
@@ -884,9 +1204,13 @@ class EqToOp(RelOp):
         left (`Expression`): Left expression.
         right (`Expression`): Right expression.
     """
+    OP = '=='
 
     def __init__(self, left: Expression, right: Expression, **kwargs):
         super().__init__("REqOp", left, right, **kwargs)
+
+    def dump(self):
+        return super().dump()
 
 
 class NotEqToOp(RelOp):
@@ -896,9 +1220,13 @@ class NotEqToOp(RelOp):
         left (`Expression`): Left expression.
         right (`Expression`): Right expression.
     """
+    OP = '!='
 
     def __init__(self, left: Expression, right: Expression, **kwargs):
         super().__init__("RNotEqOp", left, right, **kwargs)
+
+    def dump(self):
+        return super().dump()
 
 
 """ ----------------------------------------------------------------------- """
@@ -921,6 +1249,9 @@ class AndLoOp(LoOp):
     def __init__(self, left: Expression, right: Expression, **kwargs):
         super().__init__("LAndOp", left, right, **kwargs)
 
+    def dump(self):
+        return f'({self.left.dump()} && {self.right.dump()})'
+
 
 class OrLoOp(LoOp):
     """Logical or expression.
@@ -932,6 +1263,9 @@ class OrLoOp(LoOp):
 
     def __init__(self, left: Expression, right: Expression, **kwargs):
         super().__init__("LOrOp", left, right, **kwargs)
+
+    def dump(self):
+        return f'({self.left.dump()} || {self.right.dump()})'
 
 
 """ ----------------------------------------------------------------------- """
@@ -950,6 +1284,9 @@ class Concat(BinaryOp):
     def __init__(self, left: Expression, right: Expression, **kwargs):
         super().__init__("Concat", left, right, **kwargs)
 
+    def dump(self):
+        return f'_concat({self.left.dump()}, {self.right.dump()})'
+
 
 """ ----------------------------------------------------------------------- """
 """ Unary operators                                                         """
@@ -967,6 +1304,9 @@ class UnaryOp(Expression):
         super().__init__(name, **kwargs)
         self.operand = operand
 
+    def dump(self):
+        return super().dump()
+
 
 class UMinusOp(UnaryOp):
     """Lua minus unitary operator.
@@ -977,6 +1317,9 @@ class UMinusOp(UnaryOp):
 
     def __init__(self, operand: Expression, **kwargs):
         super().__init__("UMinusOp", operand, **kwargs)
+
+    def dump(self):
+        return f'-{self.operand.dump()}'
 
 
 class UBNotOp(UnaryOp):
@@ -989,6 +1332,9 @@ class UBNotOp(UnaryOp):
     def __init__(self, operand: Expression, **kwargs):
         super().__init__("UBNotOp", operand, **kwargs)
 
+    def dump(self):
+        return f'~{self.operand.dump()}'
+
 
 class ULNotOp(UnaryOp):
     """Logical not operator.
@@ -999,6 +1345,9 @@ class ULNotOp(UnaryOp):
 
     def __init__(self, operand: Expression, **kwargs):
         super().__init__("ULNotOp", operand, **kwargs)
+
+    def dump(self):
+        return f'!{self.operand.dump()}'
 
 
 """ ----------------------------------------------------------------------- """
@@ -1011,3 +1360,6 @@ class ULengthOP(UnaryOp):
 
     def __init__(self, operand: Expression, **kwargs):
         super().__init__("ULengthOp", operand, **kwargs)
+
+    def dump(self):
+        return f'_length({operand})'

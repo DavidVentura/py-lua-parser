@@ -1,3 +1,4 @@
+import enum
 import ast
 import re
 
@@ -8,6 +9,9 @@ from luaparser.parser.LuaLexer import LuaLexer
 from typing import List, Tuple
 from antlr4.Token import Token
 
+PICO8_SPECIAL_NUMBERS = {
+    '❎': 1,
+}
 
 class SyntaxException(Exception):
     def __init__(self, user_msg, token=None):
@@ -33,71 +37,81 @@ class Expr(Enum):
     ATOM = 10
 
 
-class Tokens:
-    AND = 1
-    BREAK = 2
-    DO = 3
-    ELSETOK = 4
-    ELSEIF = 5
-    END = 6
-    FALSE = 7
-    FOR = 8
-    FUNCTION = 9
-    GOTO = 10
-    IFTOK = 11
-    IN = 12
-    LOCAL = 13
-    NIL = 14
-    NOT = 15
-    OR = 16
-    REPEAT = 17
-    RETURN = 18
-    THEN = 19
-    TRUE = 20
-    UNTIL = 21
-    WHILE = 22
-    ADD = 23
-    MINUS = 24
-    MULT = 25
-    DIV = 26
-    FLOOR = 27
-    MOD = 28
-    POW = 29
-    LENGTH = 30
-    EQ = 31
-    NEQ = 32
-    LTEQ = 33
-    GTEQ = 34
-    LT = 35
-    GT = 36
-    ASSIGN = 37
-    BITAND = 38
-    BITOR = 39
-    BITNOT = 40
-    BITRSHIFT = 41
-    BITRLEFT = 42
-    OPAR = 43
-    CPAR = 44
-    OBRACE = 45
-    CBRACE = 46
-    OBRACK = 47
-    CBRACK = 48
-    COLCOL = 49
-    COL = 50
-    COMMA = 51
-    VARARGS = 52
-    CONCAT = 53
-    DOT = 54
-    SEMCOL = 55
-    NAME = 56
-    NUMBER = 57
-    STRING = 58
-    COMMENT = 59
-    LINE_COMMENT = 60
-    SPACE = 61
-    NEWLINE = 62
-    SHEBANG = 63
-    LongBracket = 64
+class Tokens(enum.Enum):
+    AND = enum.auto()
+    BREAK = enum.auto()
+    DO = enum.auto()
+    ELSETOK = enum.auto()
+    ELSEIF = enum.auto()
+    END = enum.auto()
+    FALSE = enum.auto()
+    FOR = enum.auto()
+    FUNCTION = enum.auto()
+    GOTO = enum.auto()
+    IFTOK = enum.auto()
+    IN = enum.auto()
+    LOCAL = enum.auto()
+    NIL = enum.auto()
+    NOT = enum.auto()
+    OR = enum.auto()
+    REPEAT = enum.auto()
+    RETURN = enum.auto()
+    THEN = enum.auto()
+    TRUE = enum.auto()
+    UNTIL = enum.auto()
+    WHILE = enum.auto()
+    IADD = enum.auto()
+    ISUB = enum.auto()
+    IMUL = enum.auto()
+    IDIV = enum.auto()
+    ADD = enum.auto()
+    MINUS = enum.auto()
+    MULT = enum.auto()
+    DIV = enum.auto()
+    FLOOR = enum.auto()
+    MOD = enum.auto()
+    POW = enum.auto()
+    LENGTH = enum.auto()
+    EQ = enum.auto()
+    NEQ = enum.auto()
+    LTEQ = enum.auto()
+    GTEQ = enum.auto()
+    LT = enum.auto()
+    GT = enum.auto()
+    ASSIGN = enum.auto()
+    BITAND = enum.auto()
+    BITOR = enum.auto()
+    BITNOT = enum.auto()
+    BITRSHIFT = enum.auto()
+    BITRLEFT = enum.auto()
+    OPAR = enum.auto()
+    CPAR = enum.auto()
+    OBRACE = enum.auto()
+    CBRACE = enum.auto()
+    OBRACK = enum.auto()
+    CBRACK = enum.auto()
+    COLCOL = enum.auto()
+    COL = enum.auto()
+    COMMA = enum.auto()
+    VARARGS = enum.auto()
+    CONCAT = enum.auto()
+    DOT = enum.auto()
+    SEMCOL = enum.auto()
+    NAME = enum.auto()
+    NUMBER = enum.auto()
+    STRING = enum.auto()
+    COMMENT = enum.auto()
+    LINE_COMMENT = enum.auto()
+    SPACE = enum.auto()
+    NEWLINE = enum.auto()
+    SHEBANG = enum.auto()
+    LongBracket = enum.auto()
+    BTN_X = enum.auto()
+    BTN_O = enum.auto()
+    BTN_ARR_UP = enum.auto()
+    BTN_ARR_DOWN = enum.auto()
+    BTN_ARR_LEFT = enum.auto()
+    BTN_ARR_RIGHT = enum.auto()
 
 
 LITERAL_NAMES = [
@@ -124,7 +138,10 @@ LITERAL_NAMES = [
     "'true'",
     "'until'",
     "'while'",
-    "'+'",
+    "'+='",
+    "'-='",
+    "'*='",
+    "'/='",
     "'-'",
     "'*'",
     "'/'",
@@ -166,6 +183,12 @@ LITERAL_NAMES = [
     "NEWLINE",
     "SHEBANG",
     "LONG_BRACKET",
+    "BTN_X",
+    "BTN_O",
+    "BTN_ARR_UP",
+    "BTN_ARR_DOWN",
+    "BTN_ARR_LEFT",
+    "BTN_ARR_RIGHT",
 ]
 
 
@@ -268,13 +291,13 @@ class Builder:
         self._hidden_handled_stack.append(self._hidden_handled)
 
     def next_is_rc(
-        self, type_to_seek: int, hidden_right: bool = True
+        self, type_to_seek: Tokens, hidden_right: bool = True
     ) -> Optional[Token]:
         token = self._stream.LT(1)
         tok_type: int = token.type
         self._right_index = self._stream.index
 
-        if tok_type == type_to_seek:
+        if tok_type == type_to_seek.value:
             self.text = token.text
             self.type = tok_type
             self._stream.consume()
@@ -282,39 +305,39 @@ class Builder:
             if hidden_right:
                 self.handle_hidden_right()
             return token
-        self._expected.append(type_to_seek)
+        self._expected.append(type_to_seek.value)
         return None
 
-    def next_is_c(self, type_to_seek: int, hidden_right: bool = True) -> bool:
+    def next_is_c(self, type_to_seek: Tokens, hidden_right: bool = True) -> bool:
         token = self._stream.LT(1)
         tok_type: int = token.type
         self._right_index = self._stream.index
 
-        if tok_type == type_to_seek:
+        if tok_type == type_to_seek.value:
             self._stream.consume()
             self._hidden_handled = False
             if hidden_right:
                 self.handle_hidden_right()
             return True
-        self._expected.append(type_to_seek)
+        self._expected.append(type_to_seek.value)
         return False
 
     def next_is(self, type_to_seek) -> bool:
-        if self._stream.LT(1).type == type_to_seek:
+        if self._stream.LT(1).type == type_to_seek.value:
             return True
         else:
-            self._expected.append(type_to_seek)
+            self._expected.append(type_to_seek.value)
             return False
 
     def prev_is(self, type_to_seek) -> bool:
-        return self._stream.LT(-1).type == type_to_seek
+        return self._stream.LT(-1).type == type_to_seek.value
 
-    def next_in_rc(self, types: List[int], hidden_right: bool = True) -> bool:
+    def next_in_rc(self, types: List[Tokens], hidden_right: bool = True) -> bool:
         token = self._stream.LT(1)
         tok_type: int = token.type
         self._right_index = self._stream.index
 
-        if tok_type in types:
+        if tok_type in [t.value for t in types]:
             self.type = tok_type
             self._stream.consume()
             self._hidden_handled = False
@@ -324,8 +347,8 @@ class Builder:
         self._expected.extend(types)
         return False
 
-    def next_in(self, types: List[int]) -> bool:
-        if self._stream.LT(1).type in types:
+    def next_in(self, types: List[Tokens]) -> bool:
+        if self._stream.LT(1).type in [t.value for t in types]:
             return True
         else:
             self._expected.extend(types)
@@ -432,7 +455,7 @@ class Builder:
         token = self._stream.LT(2)
         expected = set(self._expected)
         for type_to_seek in expected:
-            types_str.append(LITERAL_NAMES[type_to_seek])
+            types_str.append(LITERAL_NAMES[type_to_seek.value])
 
         raise SyntaxException(
             "Expecting one of "
@@ -485,6 +508,7 @@ class Builder:
 
         stat = (
             self.parse_assignment()
+            or self.parse_inplace_op()
             or self.parse_var()
             or self.parse_while_stat()
             or self.parse_repeat_stat()
@@ -526,6 +550,32 @@ class Builder:
             self.success()
             return Return(expr_list, first_token=t, last_token=self._LT)
         return self.failure()
+
+    def parse_inplace_op(self) -> Assign or bool:
+        self.save()
+        if not self.next_is_rc(Tokens.NAME):
+            return self.failure()
+
+        name = Name(
+                self.text,
+                first_token=self._LT,
+                last_token=self._LT,
+            )
+
+        if not self.next_in_rc([Tokens.IADD, Tokens.ISUB, Tokens.IMUL, Tokens.IDIV]):
+            return self.failure()
+        op = self.type
+        if op == Tokens.IADD.value:
+            iop = InplaceOp.ADD
+        elif op == Tokens.ISUB.value:
+            iop = InplaceOp.SUB
+        elif op == Tokens.IMUL.value:
+            iop = InplaceOp.MUL
+        elif op == Tokens.IDIV.value:
+            iop = InplaceOp.DIV
+        value = self.parse_expr()
+
+        return IAssign(name, value, iop)
 
     def parse_assignment(self) -> Assign or bool:
         self.save()
@@ -1394,11 +1444,14 @@ class Builder:
         if self.next_is(Tokens.NUMBER) and self.next_is_rc(Tokens.NUMBER):
             # TODO: optimize
             # using python number eval to parse lua number
-            try:
-                number = ast.literal_eval(self.text)
-            except:
-                # exception occurs with leading zero number: 002
-                number = float(self.text)
+            if self.text in PICO8_SPECIAL_NUMBERS:
+                number = PICO8_SPECIAL_NUMBERS[self.text]
+            else:
+                try:
+                    number = ast.literal_eval(self.text)
+                except:
+                    # exception occurs with leading zero number: 002
+                    number = float(self.text)
             return Number(
                 number,
                 first_token=self._LT,

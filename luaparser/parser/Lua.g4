@@ -43,7 +43,8 @@ block
   ;
 
 stat
-  : assignment
+  : inplace_op
+  | assignment
   | var[False]
   | do_block
   | while_stat
@@ -72,6 +73,10 @@ repeat_stat
 
 assignment
   : var_list ASSIGN expr_list // in every 'var' in 'var_list', the last must be an 'index', not a 'call'
+  ;
+
+inplace_op
+  : NAME (IADD | ISUB | IMUL | IDIV) expr
   ;
 
 local
@@ -183,6 +188,7 @@ atom
   | NIL
   | TRUE
   | FALSE
+  | BUTTON
   ;
 
 var[bool assign]
@@ -263,6 +269,10 @@ THEN      : 'then';
 TRUE      : 'true';
 UNTIL     : 'until';
 WHILE     : 'while';
+IADD      : '+=';
+ISUB      : '-=';
+IMUL      : '*=';
+IDIV      : '/=';
 ADD       : '+';
 MINUS     : '-';
 MULT      : '*';
@@ -295,10 +305,15 @@ COMMA     : ',';
 VARARGS   : '...';
 CONCAT    : '..';
 DOT       : '.';
-SEMCOL     : ';';
+SEMCOL    : ';';
 
 NAME
   : (Letter | '_') (Letter | '_' | Digit)*
+  ;
+
+BUTTON
+  : (Digit+ ('.' Digit*)? Exponent? | '.' Digit+ Exponent?)
+  | '0' ('x' | 'X') HexDigits ('.' HexDigits?)? BinaryExponent?
   ;
 
 NUMBER
@@ -347,6 +362,7 @@ fragment Letter
 
 fragment Digit
   : '0'..'9'
+  | '❎'
   ;
 
 fragment HexDigit

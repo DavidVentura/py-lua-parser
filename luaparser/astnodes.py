@@ -265,10 +265,10 @@ class Index(Lhs):
 
     def dump(self):
         if self.notation == IndexNotation.DOT:
-            return f'{self.value.dump()}["{self.idx.dump()}"]'
+            return f'{self.value.dump()}.t["{self.idx.dump()}"]'
         if isinstance(self.idx, String):
-            return f'{self.value.dump()}["{self.idx.dump()}"]'
-        return f'{self.value.dump()}[{self.idx.dump()}]'
+            return f'{self.value.dump()}.t["{self.idx.dump()}"]'
+        return f'{self.value.dump()}.t[{self.idx.dump()}]'
 
 """ ----------------------------------------------------------------------- """
 """ Statements                                                              """
@@ -681,7 +681,7 @@ class Function(Statement):
 
     def dump(self):
         return textwrap.dedent(f'''
-        TValue* {self.name.id}({" ".join(a.dump() for a in self.args)}) {{
+        TValue* {self.name.id}({", ".join("TValue " + a.dump() for a in self.args)}) {{
             {NEWLINE.join(s.dump() for s in self.body.body)}
             return NULL;
         }}''')

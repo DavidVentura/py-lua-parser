@@ -146,7 +146,7 @@ and_expr
   ;
 
 rel_expr
-  : concat_expr ((LT | GT | LTEQ | GTEQ | NEQ | EQ) concat_expr)?
+  : concat_expr ((LT | GT | LTEQ | GTEQ | NEQ | NEQP8 | EQ) concat_expr)?
   ;
 
 concat_expr
@@ -281,6 +281,7 @@ MOD       : '%';
 POW       : '^';
 LENGTH    : '#';
 EQ        : '==';
+NEQP8     : '!=';
 NEQ       : '~=';
 LTEQ      : '<=';
 GTEQ      : '>=';

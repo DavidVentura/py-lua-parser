@@ -168,6 +168,12 @@ class WalkVisitor:
         self._nodes.append(node)
         self.visit(node.body)
 
+    @visitor(IAssign)
+    def visit(self, node):
+        self._nodes.append(node)
+        self.visit(node.target)
+        self.visit(node.value)
+
     @visitor(Assign)
     def visit(self, node):
         self._nodes.append(node)
@@ -341,6 +347,14 @@ class WalkVisitor:
         self.visit(node.test)
 
     @visitor(SemiColon)
+    def visit(self, node):
+        self._nodes.append(node)
+
+    @visitor(Signature)
+    def visit(self, node):
+        self._nodes.append(node)
+
+    @visitor(Declaration)
     def visit(self, node):
         self._nodes.append(node)
 

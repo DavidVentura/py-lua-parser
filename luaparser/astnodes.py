@@ -28,17 +28,6 @@ class Type(Enum):
     TABLE    = auto()
     UNKNOWN  = auto()
 
-def _equal_dicts(d1, d2, ignore_keys):
-    ignored = set(ignore_keys)
-    for k1, v1 in d1.items():
-        if k1 not in ignored and (k1 not in d2 or d2[k1] != v1):
-            return False
-    for k2, v2 in d2.items():
-        if k2 not in ignored and k2 not in d1:
-            return False
-    return True
-
-
 class Node:
     """Base class for AST node."""
 
@@ -85,11 +74,9 @@ class Node:
         return self._name
 
     def __eq__(self, other) -> bool:
-        if isinstance(self, other.__class__):
-            return _equal_dicts(
-                self.__dict__, other.__dict__, ["_first_token", "_last_token"]
-            )
-        return False
+        if self.__class__ != other.__class__:
+            return False
+        return self._first_token == other._first_token and self._last_token == other._last_token
 
     @property
     def first_token(self) -> Optional[CommonToken]:
@@ -150,6 +137,15 @@ class Node:
             }
         }
 
+    def scope(self):
+        if self.parent is None:
+            return self
+
+        if isinstance(self.parent, (Function, LocalFunction)):
+            return self.parent
+
+        return self.parent.scope()
+
 
 class Comment(Node):
     def __init__(self, s: str, is_multi_line: bool = False, **kwargs):
@@ -173,7 +169,7 @@ class Expression(Node):
     pass
 
     def dump(self):
-        pass
+        raise ValueError(f'Expression dump not defined for {self.__class__}')
 
 
 
@@ -189,6 +185,37 @@ class Block(Node):
     def dump(self):
         return '\n'.join(s.dump() for s in self.body)
 
+    def add_declaration(self, n: Node):
+        self.body.insert(0, Declaration(n, Type.UNKNOWN))
+
+    def add_signatures(self, f: 'Function'):
+        self.body.insert(0, Signature(f))
+
+
+class Signature(Node):
+    """Declares a function's signature."""
+    def __init__(self, f: 'Function', **kwargs):
+        super(Signature, self).__init__("Signature", **kwargs)
+        self.f = f
+
+    def dump(self):
+        return f'{self.f.signature};'
+
+class Declaration(Node):
+    """Declares a variable with type"""
+    def __init__(self, name: 'Name', type: Type, **kwargs):
+        super(Declaration, self).__init__("Declaration", **kwargs)
+        self.name = name
+        self.type = type
+
+    def dump(self):
+        t = 'TValue';
+        if self.type is Type.NUMBER:
+            t = 'z8::fix32'
+        elif self.type is Type.STRING:
+            t = 'char*'
+
+        return f'{t} {self.name.id};'
 
 class Chunk(Node):
     """Define a Lua chunk.
@@ -265,9 +292,9 @@ class Index(Lhs):
 
     def dump(self):
         if self.notation == IndexNotation.DOT:
-            return f'{self.value.dump()}.t["{self.idx.dump()}"]'
+            return f'(*{self.value.dump()}.t)["{self.idx.dump()}"]'
         if isinstance(self.idx, String):
-            return f'{self.value.dump()}.t["{self.idx.dump()}"]'
+            return f'(*{self.value.dump()}.t)["{self.idx.dump()}"]'
         return f'{self.value.dump()}.t[{self.idx.dump()}]'
 
 """ ----------------------------------------------------------------------- """
@@ -293,6 +320,12 @@ class Assign(Statement):
         # so that other things like `AddOp` can do the same
         # and emit `+` for known types
         self.type = Type.UNKNOWN
+        self.local: bool = False
+
+        for t in self.targets:
+            t.parent = self
+        for v in self.values:
+            v.parent = self
 
         assert len(self.targets) == 1
         assert len(self.values) == 1
@@ -318,17 +351,18 @@ class Assign(Statement):
         v = self.values[0]
         
         if self.type == Type.NUMBER:
-            r = f'{t.dump()} = TVfromnumber({v.dump()});'
+            r = f'{t.dump()} = {v.dump()};'
         elif self.type == Type.STRING:
-            r = f'{t.dump()} = TVfromstr({v.dump()});'
+            r = f'{t.dump()} = {v.dump()};'
         elif self.type == Type.STRING:
-            r = f'{t.dump()} = TVfromstr({v.dump()});'
+            r = f'{t.dump()} = {v.dump()};'
         elif self.type == Type.BOOL:
-            r = f'{t.dump()} = TVfromnumber({v.dump()}); // bool'
+            r = f'{t.dump()} = {v.dump()};'
         elif self.type == Type.UNKNOWN:
             r = f'{t.dump()} = {v.dump()}; // unknown'
         elif self.type == Type.TABLE:
-            r = f'std::unordered_map<std::string, TValue>{t.id} = {v.dump()};'
+            # r = f'std::unordered_map<std::string, TValue>{t.id} = {v.dump()};'
+            r = f'{t.id}.t = {v.dump()};'
         else:
             raise ValueError(f'Assignment on type {self.type} unsupported')
         return r
@@ -364,6 +398,7 @@ class LocalAssign(Assign):
     def __init__(self, targets: List[Node], values: List[Node], **kwargs):
         super().__init__(targets, values, **kwargs)
         self._name: str = "LocalAssign"
+        self.local: bool = True
 
     def dump(self):
         return super().dump()
@@ -679,12 +714,25 @@ class Function(Statement):
         self.args: List[Expression] = args
         self.body: Block = body
 
+        for a in self.args:
+            a.parent = self
+
+        self.body.parent = self
+        self.ret_type = 'TValue*'  # TODO - return + variable type analysis
+
+    @property
+    def signature(self):
+        return f'{self.ret_type} {self.name.id}({", ".join("TValue " + a.dump() for a in self.args)})'
+
     def dump(self):
         return textwrap.dedent(f'''
-        TValue* {self.name.id}({", ".join("TValue " + a.dump() for a in self.args)}) {{
+         {self.signature} {{
             {NEWLINE.join(s.dump() for s in self.body.body)}
             return NULL;
         }}''')
+
+    def add_declaration(self, n: Node):
+        self.body.body.insert(0, Declaration(n, Type.UNKNOWN))
 
 
 class LocalFunction(Function):
@@ -788,6 +836,8 @@ class Number(Expression):
         self.n: NumberType = n
 
     def dump(self):
+        if isinstance(self.n, int):
+            return f'(int16_t){self.n}'
         return str(self.n)
 
 
@@ -867,8 +917,8 @@ class Table(Expression):
 
     def dump(self):
         if self.fields:
-            return f'{{ {", ".join(f.dump() for f in self.fields)} }}'
-        return '{}'
+            return f'new std::unordered_map<std::string, TValue>({{ {", ".join(f.dump() for f in self.fields)} }})'
+        return 'new std::unordered_map<std::string, TValue>()'
 
 
 class Dots(Expression):
@@ -921,7 +971,7 @@ class BinaryOp(Op):
         self.right: Expression = right
 
     def dump(self):
-        return super().dump()
+        raise ValueError(f'BinaryOp not defined for {self.__class__}')
 
 
 """ ----------------------------------------------------------------------- """
@@ -960,7 +1010,7 @@ class SubOp(AriOp):
         super().__init__("SubOp", left, right, **kwargs)
 
     def dump(self):
-        return f'_sub({self.left.dump()}, {self.right.dump()})'
+        return f'{self.left.dump()} - {self.right.dump()}'
 
 
 class MultOp(AriOp):
@@ -990,6 +1040,7 @@ class FloatDivOp(AriOp):
         super().__init__("FloatDivOp", left, right, **kwargs)
 
     def dump(self):
+        return f'_div({self.left.dump()}, {self.right.dump()})'
         return super().dump()
 
 
@@ -1145,9 +1196,6 @@ class LessThanOp(RelOp):
     def __init__(self, left: Expression, right: Expression, **kwargs):
         super().__init__("RLtOp", left, right, **kwargs)
 
-    def dump(self):
-        return super().dump()
-
 
 class GreaterThanOp(RelOp):
     """Greater than expression.
@@ -1160,9 +1208,6 @@ class GreaterThanOp(RelOp):
 
     def __init__(self, left: Expression, right: Expression, **kwargs):
         super().__init__("RGtOp", left, right, **kwargs)
-
-    def dump(self):
-        return super().dump()
 
 
 class LessOrEqThanOp(RelOp):
@@ -1177,9 +1222,6 @@ class LessOrEqThanOp(RelOp):
     def __init__(self, left: Expression, right: Expression, **kwargs):
         super().__init__("RLtEqOp", left, right, **kwargs)
 
-    def dump(self):
-        return super().dump()
-
 
 class GreaterOrEqThanOp(RelOp):
     """Greater or equal expression.
@@ -1192,9 +1234,6 @@ class GreaterOrEqThanOp(RelOp):
 
     def __init__(self, left: Expression, right: Expression, **kwargs):
         super().__init__("RGtEqOp", left, right, **kwargs)
-
-    def dump(self):
-        return super().dump()
 
 
 class EqToOp(RelOp):
@@ -1209,9 +1248,6 @@ class EqToOp(RelOp):
     def __init__(self, left: Expression, right: Expression, **kwargs):
         super().__init__("REqOp", left, right, **kwargs)
 
-    def dump(self):
-        return super().dump()
-
 
 class NotEqToOp(RelOp):
     """Not equal to expression.
@@ -1224,9 +1260,6 @@ class NotEqToOp(RelOp):
 
     def __init__(self, left: Expression, right: Expression, **kwargs):
         super().__init__("RNotEqOp", left, right, **kwargs)
-
-    def dump(self):
-        return super().dump()
 
 
 """ ----------------------------------------------------------------------- """
@@ -1303,9 +1336,6 @@ class UnaryOp(Expression):
     def __init__(self, name: str, operand: Expression, **kwargs):
         super().__init__(name, **kwargs)
         self.operand = operand
-
-    def dump(self):
-        return super().dump()
 
 
 class UMinusOp(UnaryOp):

@@ -10,7 +10,7 @@ from typing import List, Tuple
 from antlr4.Token import Token
 
 PICO8_SPECIAL_NUMBERS = {
-    '❎': 1,
+    '❎': 5,
 }
 
 class SyntaxException(Exception):
@@ -73,6 +73,7 @@ class Tokens(enum.Enum):
     POW = enum.auto()
     LENGTH = enum.auto()
     EQ = enum.auto()
+    NEQP8 = enum.auto()
     NEQ = enum.auto()
     LTEQ = enum.auto()
     GTEQ = enum.auto()
@@ -144,6 +145,7 @@ LITERAL_NAMES = [
     "'^'",
     "'#'",
     "'=='",
+    "'!='",
     "'~='",
     "'<='",
     "'>='",
@@ -204,6 +206,7 @@ class Builder:
         Tokens.GT,
         Tokens.LTEQ,
         Tokens.GTEQ,
+        Tokens.NEQP8,
         Tokens.NEQ,
         Tokens.EQ,
     ]
@@ -332,14 +335,14 @@ class Builder:
             if hidden_right:
                 self.handle_hidden_right()
             return True
-        self._expected.extend(types)
+        self._expected.extend([t.value for t in types])
         return False
 
     def next_in(self, types: List[Tokens]) -> bool:
         if self._stream.LT(1).type in [t.value for t in types]:
             return True
         else:
-            self._expected.extend(types)
+            self._expected.extend([t.value for t in types])
             return False
 
     def handle_hidden_left(self) -> None:
@@ -1209,17 +1212,19 @@ class Builder:
                 right = self.parse_concat_expr()
                 if right:
                     self.success()
-                    if op == Tokens.LT:
+                    if op == Tokens.LT.value:
                         left = LessThanOp(left, right)
-                    elif op == Tokens.GT:
+                    elif op == Tokens.GT.value:
                         left = GreaterThanOp(left, right)
-                    elif op == Tokens.LTEQ:
+                    elif op == Tokens.LTEQ.value:
                         left = LessOrEqThanOp(left, right)
-                    elif op == Tokens.GTEQ:
+                    elif op == Tokens.GTEQ.value:
                         left = GreaterOrEqThanOp(left, right)
-                    elif op == Tokens.NEQ:
+                    elif op == Tokens.NEQP8.value:
                         left = NotEqToOp(left, right)
-                    elif op == Tokens.EQ:
+                    elif op == Tokens.NEQ.value:
+                        left = NotEqToOp(left, right)
+                    elif op == Tokens.EQ.value:
                         left = EqToOp(left, right)
                 else:
                     self.failure()
@@ -1265,9 +1270,9 @@ class Builder:
                     right = self.parse_mult_expr()
                     if right:
                         self.success()
-                        if op == Tokens.ADD:
+                        if op == Tokens.ADD.value:
                             left = AddOp(left, right)
-                        elif op == Tokens.MINUS:
+                        elif op == Tokens.MINUS.value:
                             left = SubOp(left, right)
                     else:
                         self.failure()
@@ -1291,13 +1296,13 @@ class Builder:
                     right = self.parse_bitwise_expr()
                     if right:
                         self.success()
-                        if op == Tokens.MULT:
+                        if op == Tokens.MULT.value:
                             left = MultOp(left, right)
-                        elif op == Tokens.DIV:
+                        elif op == Tokens.DIV.value:
                             left = FloatDivOp(left, right)
-                        elif op == Tokens.MOD:
+                        elif op == Tokens.MOD.value:
                             left = ModOp(left, right)
-                        elif op == Tokens.FLOOR:
+                        elif op == Tokens.FLOOR.value:
                             left = FloorDivOp(left, right)
                     else:
                         self.failure()
@@ -1329,15 +1334,15 @@ class Builder:
                     right = self.parse_unary_expr()
                     if right:
                         self.success()
-                        if op == Tokens.BITAND:
+                        if op == Tokens.BITAND.value:
                             left = BAndOp(left, right)
-                        elif op == Tokens.BITOR:
+                        elif op == Tokens.BITOR.value:
                             left = BOrOp(left, right)
-                        elif op == Tokens.BITNOT:
+                        elif op == Tokens.BITNOT.value:
                             left = BXorOp(left, right)
-                        elif op == Tokens.BITRSHIFT:
+                        elif op == Tokens.BITRSHIFT.value:
                             left = BShiftROp(left, right)
-                        elif op == Tokens.BITRLEFT:
+                        elif op == Tokens.BITRLEFT.value:
                             left = BShiftLOp(left, right)
                     else:
                         self.failure()

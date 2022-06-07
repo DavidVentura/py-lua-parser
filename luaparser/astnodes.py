@@ -255,6 +255,7 @@ class Name(Lhs):
     def __init__(self, identifier: str, **kwargs):
         super(Name, self).__init__("Name", **kwargs)
         self.id: str = identifier
+        self.type = Type.UNKNOWN
 
     def dump(self):
         return self.id
@@ -288,6 +289,7 @@ class Index(Lhs):
         self.value: Expression = value
         self.notation: IndexNotation = notation
         self.id = idx.id
+        self.value.type = Type.TABLE  # anything accessed via a lookup is a table
 
 
     def dump(self):
@@ -296,6 +298,10 @@ class Index(Lhs):
         if isinstance(self.idx, String):
             return f'(*{self.value.dump()}.t)["{self.idx.dump()}"]'
         return f'{self.value.dump()}.t[{self.idx.dump()}]'
+
+    @property
+    def type(self):
+        return self.value.type
 
 """ ----------------------------------------------------------------------- """
 """ Statements                                                              """
@@ -332,16 +338,19 @@ class Assign(Statement):
         t = self.targets[0]
         v = self.values[0]
 
-        if isinstance(v, Number):
-            self.type = Type.NUMBER
-        if isinstance(v, String):
-            self.type = Type.STRING
-        if isinstance(v, TrueExpr):
-            self.type = Type.BOOL
-        if isinstance(v, FalseExpr):
-            self.type = Type.BOOL
-        if isinstance(v, Table):
-            self.type = Type.TABLE
+        if not isinstance(t, Index):
+            if isinstance(v, Number):
+                self.targets[0].type = Type.NUMBER
+            if isinstance(v, String):
+                self.targets[0].type = Type.STRING
+            if isinstance(v, TrueExpr):
+                self.targets[0].type = Type.BOOL
+            if isinstance(v, FalseExpr):
+                self.targets[0].type = Type.BOOL
+            if isinstance(v, Table):
+                self.targets[0].type = Type.TABLE
+            if isinstance(v, Call):
+                self.targets[0].type = v.type
 
     def dump(self):
         # TODO: multi assign
@@ -350,21 +359,12 @@ class Assign(Statement):
         t = self.targets[0]
         v = self.values[0]
         
-        if self.type == Type.NUMBER:
-            r = f'{t.dump()} = {v.dump()};'
-        elif self.type == Type.STRING:
-            r = f'{t.dump()} = {v.dump()};'
-        elif self.type == Type.STRING:
-            r = f'{t.dump()} = {v.dump()};'
-        elif self.type == Type.BOOL:
-            r = f'{t.dump()} = {v.dump()};'
-        elif self.type == Type.UNKNOWN:
-            r = f'{t.dump()} = {v.dump()}; // unknown'
-        elif self.type == Type.TABLE:
-            # r = f'std::unordered_map<std::string, TValue>{t.id} = {v.dump()};'
+        if t.type is Type.TABLE:
             r = f'{t.id}.t = {v.dump()};'
+        elif t.type is Type.UNKNOWN:
+            r = f'{t.dump()} = {v.dump()}; // ?'
         else:
-            raise ValueError(f'Assignment on type {self.type} unsupported')
+            r = f'{t.dump()} = {v.dump()};'
         return r
 
 class IAssign(Statement):
@@ -516,10 +516,14 @@ class If(Statement):
             '''
         else:
             # no else arm
-            if self.orelse is None or len(self.orelse) == 0:
+            if self.orelse is None or len(self.orelse.body) == 0:
                 else_arm = ''
             else:
-                else_arm = '\n'.join(s.dump() for s in self.orelse)
+                stmts = '\n'.join(s.dump() for s in self.orelse.body)
+                else_arm = f'''
+                else {{
+                    {stmts}
+                }}'''
         return cond_arm + else_arm
 
 
@@ -583,10 +587,23 @@ class Return(Statement):
     def __init__(self, values, **kwargs):
         super(Return, self).__init__("Return", **kwargs)
         self.values = values
-        self.values.parent = self
+        for v in values:
+            v.parent = self
+
+        if len(values) == 0:
+            self.type = Type.NULL
+
+        if len(values) == 1:
+            self.type = values[0].type
 
     def dump(self):
-        return super().dump()
+        if len(self.values) == 0:
+            return 'return NULL;'
+
+        if len(self.values) == 1:
+            return f'return {self.values[0].dump()};'
+
+        return f'return std::pair({", ".join(v.dump for v in self.values)});'
 
 
 class Fornum(Statement):
@@ -623,7 +640,9 @@ class Fornum(Statement):
         self.body.parent = self
 
     def dump(self):
-        return super().dump()
+        return f'''for(auto t = {self.start.dump()}; t < {self.stop.dump()}; t+= {self.step.dump()}) {{
+            {NEWLINE.join(s.dump() for s in self.body.body)}
+        }}'''
 
 
 class Forin(Statement):
@@ -665,6 +684,10 @@ class Call(Statement):
         super(Call, self).__init__("Call", **kwargs)
         self.func: Expression = func
         self.args: List[Expression] = args
+        self.type = Type.UNKNOWN
+        # TODO propagate type information from func definition
+        #if self.func and self.func.id == 'flr':
+        #    self.type = Type.NUMBER
 
         if func:
             self.func.parent = self
@@ -718,17 +741,36 @@ class Function(Statement):
             a.parent = self
 
         self.body.parent = self
-        self.ret_type = 'TValue*'  # TODO - return + variable type analysis
+        self.ret_type = '??'  # TODO - return + variable type analysis
+
+        types = set()
+        for expr in self.body.body:
+            if isinstance(expr, Return):
+                types.add(expr.type)
+
+        if len(types) == 0:
+            self.ret_type = Type.NULL
+        if len(types) == 1:
+            self.ret_type = types.pop()
 
     @property
     def signature(self):
-        return f'{self.ret_type} {self.name.id}({", ".join("TValue " + a.dump() for a in self.args)})'
+        if self.ret_type is Type.NULL:
+            t = 'void'
+        # optimization to do later
+        #elif self.ret_type is Type.NUMBER:
+        #    t = 'fix32'
+        elif self.ret_type in [Type.NUMBER, Type.STRING, Type.BOOL]:
+            t = 'TValue'
+        else:
+            raise ValueError(f'Unhandled ret type {self.ret_type}')
+
+        return f'{t} {self.name.id}({", ".join("TValue " + a.dump() for a in self.args)})'
 
     def dump(self):
         return textwrap.dedent(f'''
          {self.signature} {{
             {NEWLINE.join(s.dump() for s in self.body.body)}
-            return NULL;
         }}''')
 
     def add_declaration(self, n: Node):
@@ -830,6 +872,7 @@ class Number(Expression):
     Attributes:
         n (`int|float`): Numeric value.
     """
+    type = Type.NUMBER
 
     def __init__(self, n: NumberType, **kwargs):
         super(Number, self).__init__("Number", **kwargs)
@@ -985,6 +1028,7 @@ class BinaryOp(Op):
 
 class AriOp(BinaryOp):
     """Base class for Arithmetic Operators"""
+    type = Type.NUMBER
 
 
 class AddOp(AriOp):

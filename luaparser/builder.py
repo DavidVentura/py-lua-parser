@@ -478,7 +478,7 @@ class Builder:
                 )
         return False
 
-    def parse_block(self) -> Block:
+    def parse_block(self, until_newline=False) -> Block:
         t: Token = self._stream.LT(1)
         statements = []
 
@@ -487,6 +487,16 @@ class Builder:
             if not stat:
                 break
             statements.append(stat)
+
+            if until_newline:
+                tokens = self._stream.getHiddenTokensToRight(self._right_index)
+                found = False
+                for t in tokens:
+                    if t.type == Tokens.NEWLINE.value:
+                        found = True
+                        break
+                if found:
+                    break
 
         # optional ret stat
         stat = self.parse_ret_stat()
@@ -509,6 +519,7 @@ class Builder:
             or self.parse_repeat_stat()
             or self.parse_local()
             or self.parse_goto_stat()
+            or self.parse_short_if_stat()
             or self.parse_if_stat()
             or self.parse_for_stat()
             or self.parse_function()
@@ -880,6 +891,30 @@ class Builder:
             )
         return self.failure()
 
+    def parse_short_if_stat(self) -> If or bool:
+        self.save()
+        if self.next_is_rc(Tokens.IFTOK):
+            token = self._stream.LT(1)
+            if token.type != Tokens.OPAR.value:
+                return self.failure()
+
+            self._expected = []
+            test = self.parse_expr()
+            if test:
+                token = self._stream.LT(1)
+                body = self.parse_block(until_newline=True)
+                if body:
+                    main = If(test, body, None)
+
+                    else_exp = self.parse_else_stat(until_newline=True)  # optional
+                    if else_exp:
+                        main.orelse = else_exp
+
+                    self.success()
+                    return main
+
+        return self.failure()
+
     def parse_if_stat(self) -> If or bool:
         self.save()
         if self.next_is_rc(Tokens.IFTOK):
@@ -922,12 +957,12 @@ class Builder:
                         return ElseIf(test, body, None)  # orelse will be set in parent
         return self.failure()
 
-    def parse_else_stat(self) -> Block or bool:
+    def parse_else_stat(self, until_newline=False) -> Block or bool:
         self.save()
         if self.next_is(Tokens.ELSETOK):
             if self.next_is_rc(Tokens.ELSETOK, False):
                 self.handle_hidden_right()
-                body = self.parse_block()
+                body = self.parse_block(until_newline)
                 if body:
                     self.success()
                     return body

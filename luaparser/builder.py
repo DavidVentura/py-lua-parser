@@ -10,6 +10,10 @@ from typing import List, Tuple
 from antlr4.Token import Token
 
 PICO8_SPECIAL_NUMBERS = {
+    '⬅️': 0,
+    '➡️': 1,
+    '⬆️': 2,
+    '⬇️': 3,
     '❎': 5,
 }
 

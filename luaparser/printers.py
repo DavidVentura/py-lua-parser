@@ -108,7 +108,7 @@ class PythonStyleVisitor:
             self.dedent()
 
         for attr, attrValue in node.__dict__.items():
-            if not attr.startswith(("_", "comments")):
+            if not attr.startswith(("_", "comments", "parent")):
                 if isinstance(attrValue, Node) or isinstance(attrValue, list):
                     res += (
                         self.indent_str() + attr + ": " + self.pretty_count(attrValue)

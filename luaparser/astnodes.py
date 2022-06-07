@@ -995,7 +995,7 @@ class AddOp(AriOp):
         super().__init__("AddOp", left, right, **kwargs)
 
     def dump(self):
-        return f'_add({self.left.dump()}, {self.right.dump()})'
+        return f'{self.left.dump()} + {self.right.dump()}'
 
 
 class SubOp(AriOp):
@@ -1040,7 +1040,7 @@ class FloatDivOp(AriOp):
         super().__init__("FloatDivOp", left, right, **kwargs)
 
     def dump(self):
-        return f'_div({self.left.dump()}, {self.right.dump()})'
+        return f'{self.left.dump()} / {self.right.dump()}'
         return super().dump()
 
 
@@ -1071,7 +1071,7 @@ class ModOp(AriOp):
         super().__init__("ModOp", left, right, **kwargs)
 
     def dump(self):
-        return f'{self.left.dump()} % {self.right.dump()}'
+        return f'({self.left.dump()} % {self.right.dump()})'
 
 
 class ExpoOp(AriOp):

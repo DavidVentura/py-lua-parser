@@ -1029,7 +1029,7 @@ class MultOp(AriOp):
         super().__init__("MultOp", left, right, **kwargs)
 
     def dump(self):
-        return f'_mult({self.left.dump()}, {self.right.dump()})'
+        return f'{self.left.dump()} * {self.right.dump()}'
 
 
 class FloatDivOp(AriOp):

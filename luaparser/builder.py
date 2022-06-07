@@ -983,7 +983,7 @@ class Builder:
                     if start and self.next_is_rc(Tokens.COMMA):
                         stop = self.parse_expr()
                         if stop:
-                            step = 1
+                            step = Number(1)
                             # optional step
                             if self.next_is(Tokens.COMMA) and self.next_is_rc(
                                 Tokens.COMMA

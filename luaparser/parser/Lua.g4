@@ -357,7 +357,7 @@ fragment Letter
 
 fragment Digit
   : '0'..'9'
-  | '❎'
+  | ('❎'| '⬅️' | '➡️' | '⬆️' | '⬇️')
   ;
 
 fragment HexDigit

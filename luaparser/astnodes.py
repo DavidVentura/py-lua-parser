@@ -211,7 +211,7 @@ class Declaration(Node):
     def dump(self):
         t = 'TValue';
         if self.type is Type.NUMBER:
-            t = 'z8::fix32'
+            t = 'fix32'
         elif self.type is Type.STRING:
             t = 'char*'
 
@@ -837,7 +837,7 @@ class Number(Expression):
 
     def dump(self):
         if isinstance(self.n, int):
-            return f'(int16_t){self.n}'
+            return f'fix32({self.n})'
         return str(self.n)
 
 

@@ -900,7 +900,11 @@ class Field(Expression):
         self.between_brackets: bool = between_brackets
 
     def dump(self):
-        return f'{{ "{self.key.dump()}", {self.value.dump()} }}'
+        if isinstance(self.key, Number):
+            kd = self.key.dump()
+        else:
+            kd = f'"{self.key.dump()}"'
+        return f'{{ {kd}, {self.value.dump()} }}'
 
 
 class Table(Expression):

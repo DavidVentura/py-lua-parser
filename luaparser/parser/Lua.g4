@@ -52,6 +52,7 @@ stat
   | local
   | goto_stat
   | if_stat
+  | short_if_stat
   | for_stat
   | function
   | label
@@ -87,6 +88,10 @@ local
 
 goto_stat
   : GOTO NAME
+  ;
+
+short_if_stat
+  : IF OPAR expr CPAR expr (ELSE block)?
   ;
 
 if_stat

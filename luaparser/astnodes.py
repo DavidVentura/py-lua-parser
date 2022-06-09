@@ -640,7 +640,7 @@ class Fornum(Statement):
         self.body.parent = self
 
     def dump(self):
-        return f'''for(auto t = {self.start.dump()}; t < {self.stop.dump()}; t+= {self.step.dump()}) {{
+        return f'''for(auto {self.target.dump()} = {self.start.dump()}; {self.target.dump()} < {self.stop.dump()}; {self.target.dump()} += {self.step.dump()}) {{
             {NEWLINE.join(s.dump() for s in self.body.body)}
         }}'''
 

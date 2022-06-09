@@ -719,7 +719,11 @@ class Invoke(Statement):
         self.args: List[Expression] = args
 
     def dump(self):
-        return super().dump()
+        if len(self.args):
+            args = ', '.join(a.dump() for a in self.args)
+        else:
+            args = ''
+        return f'{self.source.dump()}.{self.func.dump()}({args});/* invoke */'
 
 
 class Function(Statement):
@@ -760,10 +764,10 @@ class Function(Statement):
         # optimization to do later
         #elif self.ret_type is Type.NUMBER:
         #    t = 'fix32'
-        elif self.ret_type in [Type.NUMBER, Type.STRING, Type.BOOL]:
+        elif self.ret_type in [Type.NUMBER, Type.STRING, Type.BOOL, Type.UNKNOWN]:
             t = 'TValue'
         else:
-            raise ValueError(f'Unhandled ret type {self.ret_type}')
+            raise ValueError(f'Unhandled ret type {self.ret_type} for {self.name.id}')
 
         return f'{t} {self.name.id}({", ".join("TValue " + a.dump() for a in self.args)})'
 
@@ -821,7 +825,11 @@ class Method(Statement):
         self.body: Block = body
 
     def dump(self):
-        return super().dump()
+        return f'''
+        void {self.source.dump()}__{self.name.dump()}({', '.join(a.dump() for a in self.args)}) {{
+            {NEWLINE.join(s.dump() for s in self.body.body)}
+        }}
+        '''
 
 
 """ ----------------------------------------------------------------------- """
@@ -1449,4 +1457,4 @@ class ULengthOP(UnaryOp):
         super().__init__("ULengthOp", operand, **kwargs)
 
     def dump(self):
-        return f'_length({operand})'
+        return f'/* _length() */'

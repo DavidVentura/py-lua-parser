@@ -964,8 +964,8 @@ class Table(Expression):
 
     def dump(self):
         if self.fields:
-            return f'new std::unordered_map<std::string, TValue>({{ {", ".join(f.dump() for f in self.fields)} }})'
-        return 'new std::unordered_map<std::string, TValue>()'
+            return f'new Table({{ {", ".join(f.dump() for f in self.fields)} }})'
+        return 'new Table()'
 
 
 class Dots(Expression):

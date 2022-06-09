@@ -992,7 +992,16 @@ class AnonymousFunction(Expression):
         self.body: Block = body
 
     def dump(self):
-        return super().dump()
+        assert len(self.args) <= 1, "> 1 Args not supported for lambdas yet" + str(self.args)
+        if len(self.args) == 1:
+            args = 'TValue'
+        else:
+            args = ''
+        return f'''
+        []({args}){{
+            {NEWLINE.join(s.dump() for s in self.body.body)}
+        }}
+        '''
 
 
 """ ----------------------------------------------------------------------- """

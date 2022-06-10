@@ -901,6 +901,8 @@ class Builder:
 
             self._expected = []
             test = self.parse_expr()
+            if self.next_is_rc(Tokens.THEN):
+                return self.failure()
             if test:
                 token = self._stream.LT(1)
                 body = self.parse_block(until_newline=True)

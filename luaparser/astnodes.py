@@ -334,39 +334,42 @@ class Assign(Statement):
         for v in self.values:
             v.parent = self
 
-        assert len(self.targets) == 1
-        assert len(self.values) == 1
-        t = self.targets[0]
-        v = self.values[0]
+        # TODO a, b = c()
+        assert len(self.targets) == len(self.values)
 
-        if not isinstance(t, Index):
-            if isinstance(v, Number):
-                self.targets[0].type = Type.NUMBER
-            if isinstance(v, String):
-                self.targets[0].type = Type.STRING
-            if isinstance(v, TrueExpr):
-                self.targets[0].type = Type.BOOL
-            if isinstance(v, FalseExpr):
-                self.targets[0].type = Type.BOOL
-            if isinstance(v, Table):
-                self.targets[0].type = Type.TABLE
-            if isinstance(v, Call):
-                self.targets[0].type = v.type
+        for i in range(0, len(self.targets)):
+            t = self.targets[i]
+            v = self.values[i]
+
+            if not isinstance(t, Index):
+                if isinstance(v, Number):
+                    self.targets[i].type = Type.NUMBER
+                if isinstance(v, String):
+                    self.targets[i].type = Type.STRING
+                if isinstance(v, TrueExpr):
+                    self.targets[i].type = Type.BOOL
+                if isinstance(v, FalseExpr):
+                    self.targets[i].type = Type.BOOL
+                if isinstance(v, Table):
+                    self.targets[i].type = Type.TABLE
+                if isinstance(v, Call):
+                    self.targets[i].type = v.type
 
     def dump(self):
         # TODO: multi assign
-        assert len(self.targets) == 1
-        assert len(self.values) == 1
-        t = self.targets[0]
-        v = self.values[0]
-        
-        if t.type is Type.TABLE:
-            r = f'{t.id}.t = {v.dump()};'
-        elif t.type is Type.UNKNOWN:
-            r = f'{t.dump()} = {v.dump()}; // ?'
-        else:
-            r = f'{t.dump()} = {v.dump()};'
-        return r
+        assert len(self.targets) == len(self.values)
+        r = []
+        for i in range(0, len(self.targets)):
+            t = self.targets[i]
+            v = self.values[i]
+
+            if t.type is Type.TABLE:
+                r.append(f'{t.id}.t = {v.dump()};')
+            elif t.type is Type.UNKNOWN:
+                r.append(f'{t.dump()} = {v.dump()}; // ?')
+            else:
+                r.append(f'{t.dump()} = {v.dump()};')
+        return '\n'.join(r)
 
 class IAssign(Statement):
     def __init__(self, target: Node, value: Node, op: Expression, **kwargs):

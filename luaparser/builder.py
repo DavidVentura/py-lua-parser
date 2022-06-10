@@ -9,6 +9,7 @@ from luaparser.parser.LuaLexer import LuaLexer
 from typing import List, Tuple
 from antlr4.Token import Token
 
+HEX_DECIMAL = re.compile(r'(?P<INT>0x[0-9a-f]+)\.(?P<DEC>[0-9a-f]+)')
 PICO8_SPECIAL_NUMBERS = {
     '⬅️': 0,
     '➡️': 1,
@@ -983,7 +984,7 @@ class Builder:
                     if start and self.next_is_rc(Tokens.COMMA):
                         stop = self.parse_expr()
                         if stop:
-                            step = Number(1)
+                            step = Number(1, NumberType.INT)
                             # optional step
                             if self.next_is(Tokens.COMMA) and self.next_is_rc(
                                 Tokens.COMMA
@@ -1475,14 +1476,34 @@ class Builder:
             # using python number eval to parse lua number
             if self.text in PICO8_SPECIAL_NUMBERS:
                 number = PICO8_SPECIAL_NUMBERS[self.text]
+                ntype = NumberType.INT
             else:
-                try:
-                    number = ast.literal_eval(self.text)
-                except:
-                    # exception occurs with leading zero number: 002
-                    number = float(self.text)
+                m = HEX_DECIMAL.match(self.text)
+                if m:
+                    integer_part = m.group('INT')
+                    decimal_part = m.group('DEC')
+                    #integer_part = int(integer_part, 16)
+                    #decimal_part = int(decimal_part, 16)
+                    number = f'{integer_part}.{decimal_part:0<4}'
+                    ntype = NumberType.FIX
+                    # number = (integer_part << 16) | decimal_part
+                else:
+                    try:
+                        number = ast.literal_eval(self.text)
+                        if isinstance(number, int):
+                            ntype = NumberType.INT
+                        else:
+                            ntype = NumberType.FLT
+                    except:
+                        # exception occurs with leading zero number: 002
+                        number = float(self.text)
+                        if number.is_integer():
+                            ntype = NumberType.FLT
+                        else:
+                            ntype = NumberType.INT
             return Number(
                 number,
+                ntype,
                 first_token=self._LT,
                 last_token=self._LT,
             )
@@ -1554,7 +1575,7 @@ class Builder:
                 if fields:  # optional
                     for field in fields:
                         if field.key is None:
-                            field.key = Number(array_like_index)
+                            field.key = Number(array_like_index, NumberType.INT)
                             array_like_index += 1
 
                 return Table(fields or [])

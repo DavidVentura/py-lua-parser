@@ -27,6 +27,7 @@ class Type(Enum):
     NULL     = auto()
     TABLE    = auto()
     UNKNOWN  = auto()
+    TESTING_INT = auto()
 
 class Node:
     """Base class for AST node."""
@@ -766,6 +767,8 @@ class Function(Statement):
         #    t = 'fix32'
         elif self.ret_type in [Type.NUMBER, Type.STRING, Type.BOOL, Type.UNKNOWN]:
             t = 'TValue'
+        elif self.ret_type is Type.TESTING_INT:  # ugh
+            t = 'int'
         else:
             raise ValueError(f'Unhandled ret type {self.ret_type} for {self.name.id}')
 
@@ -871,7 +874,10 @@ class FalseExpr(Expression):
         return 'false'
 
 
-NumberType = int or float
+class NumberType(Enum):
+    INT = auto()
+    FLT = auto()
+    FIX = auto()
 
 
 class Number(Expression):
@@ -882,14 +888,23 @@ class Number(Expression):
     """
     type = Type.NUMBER
 
-    def __init__(self, n: NumberType, **kwargs):
+    def __init__(self, n: str, ntype: NumberType, **kwargs):
         super(Number, self).__init__("Number", **kwargs)
-        self.n: NumberType = n
+        self.n: str = n
+        self.ntype: NumberType = ntype
 
     def dump(self):
-        if isinstance(self.n, int):
-            return f'fix32({self.n})'
-        return str(self.n)
+        # 0x77.aa -> fix32(0x77, 0xAA)
+        if self.ntype is NumberType.FIX:
+            _int, _dec = self.n.split('.')
+            _dec = f'0x{_dec}'
+            return f'fix32({_int}, {_dec})'
+        # 0.5 -> fix32(0.5f)
+        if self.ntype is NumberType.FLT:
+            return f'fix32({self.n}f)'
+
+        # 1 -> fix32(1)
+        return f'fix32({self.n})'
 
 
 class Varargs(Expression):

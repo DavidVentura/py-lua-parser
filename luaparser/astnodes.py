@@ -295,10 +295,10 @@ class Index(Lhs):
 
     def dump(self):
         if self.notation == IndexNotation.DOT:
-            return f'(*{self.value.dump()}.t)["{self.idx.dump()}"]'
+            return f'(*(*{self.value.dump()}.t)["{self.idx.dump()}"])'
         if isinstance(self.idx, String):
-            return f'(*{self.value.dump()}.t)["{self.idx.dump()}"]'
-        return f'{self.value.dump()}.t[{self.idx.dump()}]'
+            return f'(*(*{self.value.dump()}.t)["{self.idx.dump()}"])'
+        return f'(*(*{self.value.dump()}.t)[{self.idx.dump()}])'
 
     @property
     def type(self):
@@ -364,7 +364,7 @@ class Assign(Statement):
             v = self.values[i]
 
             if t.type is Type.TABLE:
-                r.append(f'{t.id}.t = {v.dump()};')
+                r.append(f'{t.id} = {v.dump()};')
             elif t.type is Type.UNKNOWN:
                 r.append(f'{t.dump()} = {v.dump()}; // ?')
             else:
@@ -973,7 +973,7 @@ class Field(Expression):
             kd = self.key.dump()
         else:
             kd = f'"{self.key.dump()}"'
-        return f'{{ {kd}, {self.value.dump()} }}'
+        return f'{{ {kd}, new TValue({self.value.dump()}) }}'
 
 
 class Table(Expression):

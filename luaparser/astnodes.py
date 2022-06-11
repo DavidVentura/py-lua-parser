@@ -990,8 +990,8 @@ class Table(Expression):
 
     def dump(self):
         if self.fields:
-            return f'new Table({{ {", ".join(f.dump() for f in self.fields)} }})'
-        return 'new Table()'
+            return f'new SpecialTable({{ {", ".join(f.dump() for f in self.fields)} }})'
+        return 'new SpecialTable()'
 
 
 class Dots(Expression):

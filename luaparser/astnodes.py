@@ -27,7 +27,6 @@ class Type(Enum):
     NULL     = auto()
     TABLE    = auto()
     UNKNOWN  = auto()
-    TESTING_INT = auto()
 
 class Node:
     """Base class for AST node."""
@@ -770,8 +769,6 @@ class Function(Statement):
         #    t = 'fix32'
         elif self.ret_type in [Type.NUMBER, Type.STRING, Type.BOOL, Type.UNKNOWN]:
             t = 'TValue'
-        elif self.ret_type is Type.TESTING_INT:  # ugh
-            t = 'int'
         else:
             raise ValueError(f'Unhandled ret type {self.ret_type} for {self.name.id}')
 

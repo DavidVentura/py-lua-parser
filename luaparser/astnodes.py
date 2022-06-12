@@ -1378,7 +1378,7 @@ class OrLoOp(LoOp):
         super().__init__("LOrOp", left, right, **kwargs)
 
     def dump(self):
-        return f'({self.left.dump()} || {self.right.dump()})'
+        return f'({self.left.dump()} ? {self.left.dump()} : {self.right.dump()})'
 
 
 """ ----------------------------------------------------------------------- """

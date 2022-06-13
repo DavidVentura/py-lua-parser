@@ -1403,7 +1403,7 @@ class AndLoOp(LoOp):
         super().__init__("LAndOp", left, right, **kwargs)
 
     def dump(self):
-        return f'({self.left.dump()} && {self.right.dump()})'
+        return f'_and({self.left.dump()}, {self.right.dump()})'
 
 
 class OrLoOp(LoOp):
@@ -1418,7 +1418,7 @@ class OrLoOp(LoOp):
         super().__init__("LOrOp", left, right, **kwargs)
 
     def dump(self):
-        return f'({self.left.dump()} ? {self.left.dump()} : {self.right.dump()})'
+        return f'_or({self.left.dump()}, {self.right.dump()})'
 
 
 """ ----------------------------------------------------------------------- """

@@ -288,15 +288,42 @@ class Index(Lhs):
         self.idx: Name = idx
         self.value: Expression = value
         self.notation: IndexNotation = notation
-        self.id = idx.id
+        if isinstance(idx, String):
+            self.id = idx.s
+        elif isinstance(idx, Number):
+            self.id = idx.n
+        else:
+            self.id = idx.id
         self.value.type = Type.TABLE  # anything accessed via a lookup is a table
+        self.optimized_access = False
 
+
+    def dump_write(self, op: str, value: str):
+        # a.t->set(FIELD___INDEX, a); // ?
+        field_name = f'FIELD_{self.idx.dump().upper()}'
+        return f'{self.value.dump()}.t->{op}({field_name}, {value});'
 
     def dump(self):
+        if self.optimized_access:
+            if isinstance(self.idx, String):
+                _name = self.idx.s
+            else:
+                _name = self.idx.dump()
+            field_name = f'FIELD_{_name.upper()}'
+
+            if isinstance(self.parent, Assign):
+                assert False, "Should never call dump() on Index from Assign"
+            return f'{self.value.dump()}.t->get({field_name})'
+
         if self.notation == IndexNotation.DOT:
+            # DOT notation (a.b) is always a string (a["b"])
             return f'(*(*{self.value.dump()}.t)["{self.idx.dump()}"])'
+
+        # bracket notation could be a string (a["b"])
         if isinstance(self.idx, String):
             return f'(*(*{self.value.dump()}.t)["{self.idx.dump()}"])'
+
+        # a name (a[var]) or number (a[5])
         return f'(*(*{self.value.dump()}.t)[{self.idx.dump()}])'
 
     @property
@@ -362,7 +389,9 @@ class Assign(Statement):
             t = self.targets[i]
             v = self.values[i]
 
-            if t.type is Type.TABLE:
+            if isinstance(t, Index) and t.optimized_access:
+                r.append(t.dump_write('set', v.dump()))
+            elif t.type is Type.TABLE:
                 r.append(f'{t.id} = {v.dump()};')
             elif t.type is Type.UNKNOWN:
                 r.append(f'{t.dump()} = {v.dump()}; // ?')
@@ -381,6 +410,17 @@ class IAssign(Statement):
         self.value.parent = self
 
     def dump(self):
+        if isinstance(self.target, Index):
+            # b.t->x += fix32(5)
+            # ->
+            # b.t->inc(FIELD_X, fix32(5));
+            _map = {InplaceOp.ADD: 'inc',
+                    InplaceOp.SUB: 'sub',
+                    InplaceOp.MUL: 'mul',
+                    InplaceOp.DIV: 'div',
+                    }
+            return  self.target.dump_write(_map[self.op], self.value.dump())
+
         _map = {InplaceOp.ADD:  '+=',
                 InplaceOp.SUB:  '-=',
                 InplaceOp.MUL: '*=',

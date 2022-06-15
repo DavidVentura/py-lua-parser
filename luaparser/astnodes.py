@@ -970,6 +970,7 @@ class String(Expression):
         s (`string`): String value.
         delimiter (`StringDelimiter`): The string delimiter
     """
+    type = Type.STRING
 
     def __init__(
         self,

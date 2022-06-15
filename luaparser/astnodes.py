@@ -300,7 +300,11 @@ class Index(Lhs):
 
     def dump_write(self, op: str, value: str):
         # a.t->set(FIELD___INDEX, a); // ?
-        field_name = f'FIELD_{self.idx.dump().upper()}'
+        if isinstance(self.idx, String):
+            _name = self.idx.s
+        else:
+            _name = self.idx.dump()
+        field_name = f'FIELD_{_name.upper()}'
         return f'{self.value.dump()}.t->{op}({field_name}, {value});'
 
     def dump(self):

@@ -181,14 +181,18 @@ class Block(Node):
         self.body: List[Statement] = body
         for s in body:
             s.parent = self
+        self.functions: List[Function] = []
+        self.vars: List = []
 
     def dump(self):
         return '\n'.join(s.dump() for s in self.body)
 
     def add_declaration(self, n: Node):
         self.body.insert(0, Declaration(n, Type.UNKNOWN))
+        self.vars.append(n)
 
     def add_signatures(self, f: 'Function'):
+        self.functions.append(f)
         self.body.insert(0, Signature(f))
 
 
@@ -382,6 +386,9 @@ class Assign(Statement):
                     self.targets[i].type = Type.BOOL
                 if isinstance(v, Table):
                     self.targets[i].type = Type.TABLE
+                if isinstance(v, AnonymousFunction):
+                    # TODO: closures (non top-level) should also be lambdas
+                    self.targets[i].type = Type.FUNCTION
                 if isinstance(v, Call):
                     self.targets[i].type = v.type
 
@@ -742,9 +749,23 @@ class Call(Statement):
             a.parent = self
 
     def dump(self):
-        r = f'''{self.func.id}({", ".join(a.dump() for a in self.args)})'''
+        # FIXME: finding "name in all scopes recursively going up" should be a thing
+        is_vec = False
+        scope_ids = [n.id for n in self.scope().scope().body.vars]
+        if self.func.id in scope_ids:
+            is_vec = True
+        if isinstance(self.func, Index): # table-based calls are always user-defined
+                                         # -> lambdas
+            is_vec = True
+
+        args = f'{", ".join(a.dump() for a in self.args)}'
+        if is_vec:
+            args = f'{{{args}}}'
+
+        r = f'''{self.func.dump()}({args})'''
         if isinstance(self.parent, Block):
             r += ';'
+
         return r
 
 
@@ -1060,15 +1081,15 @@ class AnonymousFunction(Expression):
         self.body: Block = body
 
     def dump(self):
-        assert len(self.args) <= 1, "> 1 Args not supported for lambdas yet" + str(self.args)
-        if len(self.args) == 1:
-            args = 'TValue'
-        else:
-            args = ''
+        for a in self.args:
+            assert isinstance(a, Name)
+        args = '\n'.join(f'TValue {a.id} = get_with_default(args, {idx});' for idx, a in enumerate(self.args))
+
         return f'''
-        []({args}){{
+        TValue([&](std::vector<TValue> args) -> TValue {{
+            {args}
             {NEWLINE.join(s.dump() for s in self.body.body)}
-        }}
+        }})
         '''
 
 

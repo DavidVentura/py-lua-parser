@@ -944,7 +944,7 @@ class Number(Expression):
             return f'fix32({self.n}f)'
 
         # 1 -> fix32(1)
-        return f'fix32({self.n})'
+        return f'{self.n}'
 
 
 class Varargs(Expression):

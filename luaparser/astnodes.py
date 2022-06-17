@@ -31,6 +31,9 @@ class Type(Enum):
 class Node:
     """Base class for AST node."""
 
+    def replace_child(self, child, new_child):
+        raise NotImplementedError(f'replace_child is not implemented for {type(self)}')
+
     def dump(self):
         raise NotImplementedError(f'dump is not implemented for {type(self)}')
 
@@ -218,6 +221,8 @@ class Declaration(Node):
             t = 'fix32'
         elif self.type is Type.STRING:
             t = 'char*'
+        elif self.type is Type.NULL:
+            t = 'void'
 
         return f'{t} {self.name.id};'
 
@@ -376,6 +381,8 @@ class Assign(Statement):
             v = self.values[i]
 
             if not isinstance(t, Index):
+                if isinstance(v, Nil):
+                    self.targets[i].type = Type.NULL
                 if isinstance(v, Number):
                     self.targets[i].type = Type.NUMBER
                 if isinstance(v, String):
@@ -734,6 +741,11 @@ class Call(Statement):
         args (`list<Expression>`): Function call arguments.
     """
 
+    def replace_child(self, child, new_child):
+        idx = self.args.index(child)
+        self.args[idx] = new_child
+        new_child.parent = self
+
     def __init__(self, func: Expression, args: List[Expression], **kwargs):
         super(Call, self).__init__("Call", **kwargs)
         self.func: Expression = func
@@ -751,7 +763,10 @@ class Call(Statement):
     def dump(self):
         # FIXME: finding "name in all scopes recursively going up" should be a thing
         is_vec = False
-        scope_ids = [n.id for n in self.scope().scope().body.vars]
+        if isinstance(self.scope().scope().body, Method):
+            scope_ids = [n.id for n in self.scope().scope().vars]
+        else:
+            scope_ids = [n.id for n in self.scope().scope().body.vars]
         if self.func.id in scope_ids:
             is_vec = True
         if isinstance(self.func, Index): # table-based calls are always user-defined
@@ -786,12 +801,13 @@ class Invoke(Statement):
         self.func: Expression = func
         self.args: List[Expression] = args
 
+    def replace_with_idx_call(self):
+        i = Index(self.func, self.source)
+        c = Call(i, [self.source]+self.args)
+        return c
+
     def dump(self):
-        if len(self.args):
-            args = ', '.join(a.dump() for a in self.args)
-        else:
-            args = ''
-        return f'{self.source.dump()}.{self.func.dump()}({args});/* invoke */'
+        raise ValueError("Must not call dump() on Invoke")
 
 
 class Function(Statement):
@@ -892,12 +908,31 @@ class Method(Statement):
         self.args: List[Expression] = args
         self.body: Block = body
 
+        for a in self.args:
+            a.parent = self
+
+        self.body.parent = self
+        self.ret_type = '??'  # TODO - return + variable type analysis
+
+        types = set()
+        for expr in self.body.body:
+            if isinstance(expr, Return):
+                types.add(expr.type)
+
+        if len(types) == 0:
+            self.ret_type = Type.NULL
+        if len(types) == 1:
+            self.ret_type = types.pop()
+
     def dump(self):
-        return f'''
-        void {self.source.dump()}__{self.name.dump()}({', '.join(a.dump() for a in self.args)}) {{
-            {NEWLINE.join(s.dump() for s in self.body.body)}
-        }}
-        '''
+        raise ValueError('Should never call dump() on Method')
+
+    def replace_with_assign(self):
+        i = Index(self.name, self.source)
+        _args = [Name('self')] + self.args
+        v = AnonymousFunction(_args, self.body)
+        a = Assign([i], [v])
+        return a
 
 
 """ ----------------------------------------------------------------------- """
@@ -911,12 +946,13 @@ class Method(Statement):
 
 class Nil(Expression):
     """Define the Lua nil expression."""
+    type = Type.NULL
 
     def __init__(self, **kwargs):
         super(Nil, self).__init__("Nil", **kwargs)
 
     def dump(self):
-        return super().dump()
+        return "TValue()" # null tvalue
 
 
 class TrueExpr(Expression):
@@ -1090,7 +1126,7 @@ class AnonymousFunction(Expression):
             {args}
             {NEWLINE.join(s.dump() for s in self.body.body)}
         }})
-        '''
+    '''
 
 
 """ ----------------------------------------------------------------------- """

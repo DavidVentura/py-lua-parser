@@ -198,6 +198,11 @@ class Block(Node):
         self.functions.append(f)
         self.body.insert(0, Signature(f))
 
+    def replace_child(self, child, new_child):
+        idx = self.body.index(child)
+        self.body[idx] = new_child
+        new_child.parent = self
+
 
 class Signature(Node):
     """Declares a function's signature."""

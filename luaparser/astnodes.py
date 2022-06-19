@@ -314,7 +314,7 @@ class Index(Lhs):
         else:
             _name = self.idx.dump()
         field_name = f'FIELD_{_name.upper()}'
-        return f'{self.value.dump()}.t->{op}({field_name}, {value});'
+        return f'std::get<SpecialTable*>({self.value.dump()}.data)->{op}({field_name}, {value});'
 
     def dump(self):
         if self.optimized_access:
@@ -326,18 +326,18 @@ class Index(Lhs):
 
             if isinstance(self.parent, Assign):
                 assert False, "Should never call dump() on Index from Assign"
-            return f'{self.value.dump()}.t->get({field_name})'
+            return f'std::get<SpecialTable*>({self.value.dump()}.data)->get({field_name})'
 
         if self.notation == IndexNotation.DOT:
             # DOT notation (a.b) is always a string (a["b"])
-            return f'(*(*{self.value.dump()}.t)["{self.idx.dump()}"])'
+            return f'(*(*std::get<SpecialTable*>({self.value.dump()}.data))["{self.idx.dump()}"])'
 
         # bracket notation could be a string (a["b"])
         if isinstance(self.idx, String):
-            return f'(*(*{self.value.dump()}.t)["{self.idx.dump()}"])'
+            return f'(*(*std::get<SpecialTable*>({self.value.dump()}.data))["{self.idx.dump()}"])'
 
         # a name (a[var]) or number (a[5])
-        return f'(*(*{self.value.dump()}.t)[{self.idx.dump()}])'
+        return f'(*(*std::get<SpecialTable*>({self.value.dump()}.data))[{self.idx.dump()}])'
 
     @property
     def type(self):

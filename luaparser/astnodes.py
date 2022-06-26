@@ -341,6 +341,10 @@ class Index(Lhs):
         if isinstance(self.idx, String):
             return f'(*(*std::get<SpecialTable*>({self.value.dump()}.data))["{self.idx.dump()}"])'
 
+        # literal table
+        # -> (*self.value.dump()[self.idx.dump()])
+        if isinstance(self.value, Table):
+            return f'*((*{self.value.dump()})[{self.idx.dump()}])'
         # a name (a[var]) or number (a[5])
         return f'(*(*std::get<SpecialTable*>({self.value.dump()}.data))[{self.idx.dump()}])'
 

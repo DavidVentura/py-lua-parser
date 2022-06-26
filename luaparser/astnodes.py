@@ -937,6 +937,7 @@ class Method(Statement):
         _args = [Name('self')] + self.args
         v = AnonymousFunction(_args, self.body)
         a = Assign([i], [v])
+        a.parent = self.parent
         return a
 
 
@@ -1155,6 +1156,8 @@ class BinaryOp(Op):
         super(BinaryOp, self).__init__(name, **kwargs)
         self.left: Expression = left
         self.right: Expression = right
+        self.left.parent = self
+        self.right.parent = self
 
     def dump(self):
         raise ValueError(f'BinaryOp not defined for {self.__class__}')
@@ -1523,6 +1526,7 @@ class UnaryOp(Expression):
     def __init__(self, name: str, operand: Expression, **kwargs):
         super().__init__(name, **kwargs)
         self.operand = operand
+        self.operand.parent = self
 
 
 class UMinusOp(UnaryOp):

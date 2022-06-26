@@ -149,6 +149,13 @@ class Node:
 
         return self.parent.scope()
 
+    def is_inside(self, what):
+        if self.parent is None:
+            return None
+        if isinstance(self.parent, what):
+            return self.parent
+        return self.parent.is_inside(what)
+
 
 class Comment(Node):
     def __init__(self, s: str, is_multi_line: bool = False, **kwargs):
@@ -245,6 +252,9 @@ class Chunk(Node):
 
     def dump(self):
         pass
+
+    def add_declaration(self, n: Node):
+        self.body.body.insert(0, Declaration(n, Type.UNKNOWN))
 
 
 """
@@ -407,6 +417,17 @@ class Assign(Statement):
                     self.targets[i].type = Type.FUNCTION
                 if isinstance(v, Call):
                     self.targets[i].type = v.type
+
+    def replace_child(self, child, new_child):
+        new_child.parent = self
+        for t in self.targets:
+            if t == child:
+                idx = self.targets.index(child)
+                self.targets[idx] = new_child
+        for v in self.values:
+            if v == child:
+                idx = self.values.index(child)
+                self.values[idx] = new_child
 
     def dump(self):
         # TODO: multi assign
@@ -920,6 +941,7 @@ class Method(Statement):
         for a in self.args:
             a.parent = self
 
+        self.vars = []
         self.body.parent = self
         self.ret_type = '??'  # TODO - return + variable type analysis
 
@@ -1015,7 +1037,7 @@ class Number(Expression):
             return f'fix32({self.n}f)'
 
         # 1 -> fix32(1)
-        return f'{self.n}'
+        return f'fix32({self.n})'
 
 
 class Varargs(Expression):
@@ -1078,7 +1100,7 @@ class Field(Expression):
         self.between_brackets: bool = between_brackets
 
     def dump(self):
-        if isinstance(self.key, Number):
+        if isinstance(self.key, (String, Number)):
             kd = self.key.dump()
         else:
             kd = f'"{self.key.dump()}"'
@@ -1477,6 +1499,7 @@ class AndLoOp(LoOp):
         super().__init__("LAndOp", left, right, **kwargs)
 
     def dump(self):
+        return f'({self.left.dump()} && {self.right.dump()})'
         return f'_and({self.left.dump()}, {self.right.dump()})'
 
 

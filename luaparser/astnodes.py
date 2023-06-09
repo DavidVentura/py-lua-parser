@@ -228,7 +228,7 @@ class Declaration(Node):
         self.type = type
 
     def dump(self):
-        t = 'TValue';
+        t = 'TValue_t';
         if self.type is Type.NUMBER:
             t = 'fix32'
         elif self.type is Type.STRING:
@@ -329,7 +329,8 @@ class Index(Lhs):
         else:
             _name = self.idx.dump()
         field_name = f'FIELD_{_name.upper()}'
-        return f'std::get<SpecialTable*>({self.value.dump()}.data)->{op}({field_name}, {value});'
+        return f'NOT_USED_set_tabvalue({self.value.dump()}.table, {field_name}, {value});'
+        return f'{self.value.dump()}.table->{op}({field_name}, {value});'
 
     def dump(self):
         if self.optimized_access:
@@ -341,22 +342,34 @@ class Index(Lhs):
 
             if isinstance(self.parent, Assign):
                 assert False, "Should never call dump() on Index from Assign"
-            return f'std::get<SpecialTable*>({self.value.dump()}.data)->get({field_name})'
+            return f'OPTIMIZEDget_tabvalue({self.value.dump()}, {field_name})'
 
-        if self.notation == IndexNotation.DOT:
-            # DOT notation (a.b) is always a string (a["b"])
-            return f'(*(*std::get<SpecialTable*>({self.value.dump()}.data))["{self.idx.dump()}"])'
+        if isinstance(self.parent, Assign):
+            # TODO change Assign of Index ( tab[idx] = ? ) to Settab
+            value = self.parent.values[0]
+            assert len(self.parent.values), "Too many values"
 
-        # bracket notation could be a string (a["b"])
-        if isinstance(self.idx, String):
-            return f'(*(*std::get<SpecialTable*>({self.value.dump()}.data))["{self.idx.dump()}"])'
+            if self.notation == IndexNotation.DOT:
+                # DOT notation (a.b) is always a string (a["b"])
+                return f'set_tabvalue({self.value.dump()}.table, TSTR("{self.idx.dump()}"), {value.dump()})'
 
-        # literal table
-        # -> (*self.value.dump()[self.idx.dump()])
-        if isinstance(self.value, Table):
-            return f'*((*{self.value.dump()})[{self.idx.dump()}])'
-        # a name (a[var]) or number (a[5])
-        return f'(*(*std::get<SpecialTable*>({self.value.dump()}.data))[{self.idx.dump()}])'
+            # bracket notation could be a string (a["b"])
+            if isinstance(self.idx, String):
+                return f'set_tabvalue({self.value.dump()}.table, TSTR({self.idx.dump()}), {value.dump()})'
+
+            # a name (a[var]) or number (a[5])
+            return f'set_tabvalue({self.value.dump()}.table, {self.idx.dump()}, {value.dump()})'
+        else:
+            if self.notation == IndexNotation.DOT:
+                # DOT notation (a.b) is always a string (a["b"])
+                return f'get_tabvalue({self.value.dump()}.table, TSTR("{self.idx.dump()}"))'
+
+            # bracket notation could be a string (a["b"])
+            if isinstance(self.idx, String):
+                return f'get_tabvalue({self.value.dump()}.table, TSTR({self.idx.dump()}))'
+
+            # a name (a[var]) or number (a[5])
+            return f'get_tabvalue({self.value.dump()}.table, {self.idx.dump()})'
 
     @property
     def type(self):
@@ -469,12 +482,12 @@ class IAssign(Statement):
                     }
             return  self.target.dump_write(_map[self.op], self.value.dump())
 
-        _map = {InplaceOp.ADD:  '+=',
-                InplaceOp.SUB:  '-=',
-                InplaceOp.MUL: '*=',
-                InplaceOp.DIV:  '/=',
+        _map = {InplaceOp.ADD:  '_pluseq',
+                InplaceOp.SUB:  '_minuseq',
+                InplaceOp.MUL: '_muleq',
+                InplaceOp.DIV:  '_diveq',
                 }
-        return f'{self.target.dump()} {_map[self.op]} {self.value.dump()};'
+        return f'{_map[self.op]}(&{self.target.dump()}, {self.value.dump()});'
 
 
 
@@ -596,12 +609,20 @@ class If(Statement):
             self.orelse.parent = self
 
     def dump(self):
+        if isinstance(self.test, ULNotOp):
+            _check = '!_bool'
+        else:
+            _check = '_bool'
         cond_arm = f'''
-        if ({self.test.dump()}) {{
+        if ({_check}({self.test.dump()})) {{
         {self.body.dump()}
         }}'''
         if isinstance(self.orelse, ElseIf):
-            else_arm = f'''else if ({self.orelse.test.dump()}) {{
+            if isinstance(self.orelse.test, ULNotOp):
+                _check = '!_bool'
+            else:
+                _check = '_bool'
+            else_arm = f'''else if ({_check}({self.orelse.test.dump()})) {{
             {self.orelse.body.dump()}
             }}
             '''
@@ -731,7 +752,7 @@ class Fornum(Statement):
         self.body.parent = self
 
     def dump(self):
-        return f'''for(auto {self.target.dump()} = {self.start.dump()}; {self.target.dump()} < {self.stop.dump()}; {self.target.dump()} += {self.step.dump()}) {{
+        return f'''for(TValue_t {self.target.dump()} = {self.start.dump()}; _lt({self.target.dump()}, {self.stop.dump()}); {self.target.dump()} = _add({self.target.dump()}, {self.step.dump()})) {{
             {NEWLINE.join(s.dump() for s in self.body.body)}
         }}'''
 
@@ -879,11 +900,11 @@ class Function(Statement):
         #elif self.ret_type is Type.NUMBER:
         #    t = 'fix32'
         elif self.ret_type in [Type.NUMBER, Type.STRING, Type.BOOL, Type.UNKNOWN]:
-            t = 'TValue'
+            t = 'TValue_t'
         else:
             raise ValueError(f'Unhandled ret type {self.ret_type} for {self.name.id}')
 
-        return f'{t} {self.name.id}({", ".join("TValue " + a.dump() for a in self.args)})'
+        return f'{t} {self.name.id}({", ".join("TValue_t " + a.dump() for a in self.args)})'
 
     def dump(self):
         return textwrap.dedent(f'''
@@ -984,7 +1005,7 @@ class Nil(Expression):
         super(Nil, self).__init__("Nil", **kwargs)
 
     def dump(self):
-        return "TValue()" # null tvalue
+        return "NUL" # null tvalue
 
 
 class TrueExpr(Expression):
@@ -994,7 +1015,7 @@ class TrueExpr(Expression):
         super(TrueExpr, self).__init__("True", **kwargs)
 
     def dump(self):
-        return 'true'
+        return 'T_TRUE'
 
 
 class FalseExpr(Expression):
@@ -1004,7 +1025,7 @@ class FalseExpr(Expression):
         super(FalseExpr, self).__init__("False", **kwargs)
 
     def dump(self):
-        return 'false'
+        return 'T_FALSE'
 
 
 class NumberType(Enum):
@@ -1031,13 +1052,13 @@ class Number(Expression):
         if self.ntype is NumberType.FIX:
             _int, _dec = self.n.split('.')
             _dec = f'0x{_dec}'
-            return f'fix32({_int}, {_dec})'
+            return f'TNUM(((fix32_t){{.i = {_int}, .f = {_dec} }}))'
         # 0.5 -> fix32(0.5f)
         if self.ntype is NumberType.FLT:
-            return f'fix32({self.n}f)'
+            return f'TNUM(fix32_from_float({self.n}f))'
 
         # 1 -> fix32(1)
-        return f'fix32({self.n})'
+        return f'TNUM16({self.n})'
 
 
 class Varargs(Expression):
@@ -1103,8 +1124,8 @@ class Field(Expression):
         if isinstance(self.key, (String, Number)):
             kd = self.key.dump()
         else:
-            kd = f'"{self.key.dump()}"'
-        return f'{{ {kd}, new TValue({self.value.dump()}) }}'
+            kd = f'TSTR("{self.key.dump()}")'
+        return f'{kd}, {self.value.dump()}'
 
 
 class Table(Expression):
@@ -1121,8 +1142,17 @@ class Table(Expression):
 
     def dump(self):
         if self.fields:
-            return f'new SpecialTable({{ {", ".join(f.dump() for f in self.fields)} }})'
-        return 'new SpecialTable()'
+            # FIXME depends on context now; must be created in scope, then assigned at this point?
+            _field_lines = []
+            target_var = 'T_IDK'
+            if isinstance(self.parent, Assign):
+                target_var = self.parent.targets[0].id
+                assert len(self.parent.targets) == 1, "Not sure which table this is"
+            for f in self.fields:
+                _field_lines.append(f'set_tabvalue({target_var}.table, {f.dump()});')
+            _field_lines = "\n".join(_field_lines)
+            return f'TTAB(make_table(4)); {_field_lines}'
+        return 'TTAB(make_table(4))'
 
 
 class Dots(Expression):
@@ -1153,6 +1183,10 @@ class AnonymousFunction(Expression):
             assert isinstance(a, Name)
         args = '\n'.join(f'TValue {a.id} = get_with_default(args, {idx});' for idx, a in enumerate(self.args))
 
+        # Lift all closures to:
+        # - Be declared as a regular, top-level function
+        # - Read/Write _enclosed_ variables from UpValue table
+        #   - How to know when it's an UpValue ???
         return f'''
         TValue([&](std::vector<TValue> args) -> TValue {{
             {args}
@@ -1211,7 +1245,7 @@ class AddOp(AriOp):
         super().__init__("AddOp", left, right, **kwargs)
 
     def dump(self):
-        return f'{self.left.dump()} + {self.right.dump()}'
+        return f'_add({self.left.dump()}, {self.right.dump()})'
 
 
 class SubOp(AriOp):
@@ -1226,7 +1260,7 @@ class SubOp(AriOp):
         super().__init__("SubOp", left, right, **kwargs)
 
     def dump(self):
-        return f'{self.left.dump()} - {self.right.dump()}'
+        return f'_sub({self.left.dump()}, {self.right.dump()})'
 
 
 class MultOp(AriOp):
@@ -1241,7 +1275,7 @@ class MultOp(AriOp):
         super().__init__("MultOp", left, right, **kwargs)
 
     def dump(self):
-        return f'{self.left.dump()} * {self.right.dump()}'
+        return f'_mult({self.left.dump()}, {self.right.dump()})'
 
 
 class FloatDivOp(AriOp):
@@ -1256,8 +1290,7 @@ class FloatDivOp(AriOp):
         super().__init__("FloatDivOp", left, right, **kwargs)
 
     def dump(self):
-        return f'{self.left.dump()} / {self.right.dump()}'
-        return super().dump()
+        return f'_div({self.left.dump()}, {self.right.dump()})'
 
 
 class FloorDivOp(AriOp):
@@ -1395,9 +1428,10 @@ class BShiftLOp(BitOp):
 
 
 class RelOp(BinaryOp):
+    type = Type.BOOL
     """Base class for Lua relational operators."""
     def dump(self):
-        return f'({self.left.dump()} {self.OP} {self.right.dump()})'
+        return f'{self.OP}({self.left.dump()}, {self.right.dump()})'
 
 
 class LessThanOp(RelOp):
@@ -1407,7 +1441,7 @@ class LessThanOp(RelOp):
         left (`Expression`): Left expression.
         right (`Expression`): Right expression.
     """
-    OP = '<'
+    OP = '_lt'
 
     def __init__(self, left: Expression, right: Expression, **kwargs):
         super().__init__("RLtOp", left, right, **kwargs)
@@ -1420,7 +1454,7 @@ class GreaterThanOp(RelOp):
         left (`Expression`): Left expression.
         right (`Expression`): Right expression.
     """
-    OP = '>'
+    OP = '_gt'
 
     def __init__(self, left: Expression, right: Expression, **kwargs):
         super().__init__("RGtOp", left, right, **kwargs)
@@ -1433,7 +1467,7 @@ class LessOrEqThanOp(RelOp):
         left (`Expression`): Left expression.
         right (`Expression`): Right expression.
     """
-    OP = '<='
+    OP = '_leq'
 
     def __init__(self, left: Expression, right: Expression, **kwargs):
         super().__init__("RLtEqOp", left, right, **kwargs)
@@ -1446,7 +1480,7 @@ class GreaterOrEqThanOp(RelOp):
         left (`Expression`): Left expression.
         right (`Expression`): Right expression.
     """
-    OP = '>='
+    OP = '_geq'
 
     def __init__(self, left: Expression, right: Expression, **kwargs):
         super().__init__("RGtEqOp", left, right, **kwargs)
@@ -1459,7 +1493,7 @@ class EqToOp(RelOp):
         left (`Expression`): Left expression.
         right (`Expression`): Right expression.
     """
-    OP = '=='
+    OP = '_equal'
 
     def __init__(self, left: Expression, right: Expression, **kwargs):
         super().__init__("REqOp", left, right, **kwargs)
@@ -1472,7 +1506,7 @@ class NotEqToOp(RelOp):
         left (`Expression`): Left expression.
         right (`Expression`): Right expression.
     """
-    OP = '!='
+    OP = '_notequal'
 
     def __init__(self, left: Expression, right: Expression, **kwargs):
         super().__init__("RNotEqOp", left, right, **kwargs)
@@ -1567,7 +1601,7 @@ class UMinusOp(UnaryOp):
         super().__init__("UMinusOp", operand, **kwargs)
 
     def dump(self):
-        return f'-{self.operand.dump()}'
+        return f'_invert_sign({self.operand.dump()})'
 
 
 class UBNotOp(UnaryOp):
@@ -1595,7 +1629,7 @@ class ULNotOp(UnaryOp):
         super().__init__("ULNotOp", operand, **kwargs)
 
     def dump(self):
-        return f'!{self.operand.dump()}'
+        return f'{self.operand.dump()}'
 
 
 """ ----------------------------------------------------------------------- """

@@ -180,6 +180,13 @@ class WalkVisitor:
         self.visit(node.targets)
         self.visit(node.values)
 
+    @visitor(SetTabValue)
+    def visit(self, node):
+        self._nodes.append(node)
+        self.visit(node.table)
+        self.visit(node.key)
+        self.visit(node.value)
+
     @visitor(While)
     def visit(self, node):
         self._nodes.append(node)
@@ -286,6 +293,10 @@ class WalkVisitor:
         self._nodes.append(node)
 
     @visitor(Number)
+    def visit(self, node):
+        self._nodes.append(node)
+
+    @visitor(FunctionReference)
     def visit(self, node):
         self._nodes.append(node)
 

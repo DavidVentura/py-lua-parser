@@ -377,32 +377,19 @@ class Index(Lhs):
                 assert False, "Should never call dump() on Index from Assign"
             return f'OPTIMIZEDget_tabvalue({self.value.dump()}, {field_name})'
 
-        if isinstance(self.parent, Assign):
-            # TODO change Assign of Index ( tab[idx] = ? ) to Settab
-            value = self.parent.values[0]
-            assert len(self.parent.values), "Too many values"
+        if isinstance(self.parent, Assign) and self in self.parent.targets:
+            assert False, "This should've been replaced with SetTabValue"
 
-            if self.notation == IndexNotation.DOT:
-                # DOT notation (a.b) is always a string (a["b"])
-                return f'set_tabvalue({self.value.dump()}.table, TSTR("{self.idx.dump()}"), {value.dump()})'
+        if self.notation == IndexNotation.DOT:
+            # DOT notation (a.b) is always a string (a["b"])
+            return f'get_tabvalue({self.value.dump()}.table, TSTR("{self.idx.dump()}"))'
 
-            # bracket notation could be a string (a["b"])
-            if isinstance(self.idx, String):
-                return f'set_tabvalue({self.value.dump()}.table, TSTR({self.idx.dump()}), {value.dump()})'
-
-            # a name (a[var]) or number (a[5])
-            return f'set_tabvalue({self.value.dump()}.table, {self.idx.dump()}, {value.dump()})'
-        else:
-            if self.notation == IndexNotation.DOT:
-                # DOT notation (a.b) is always a string (a["b"])
-                return f'get_tabvalue({self.value.dump()}.table, TSTR("{self.idx.dump()}"))'
-
-            # bracket notation could be a string (a["b"])
-            if isinstance(self.idx, String):
-                return f'get_tabvalue({self.value.dump()}.table, TSTR({self.idx.dump()}))'
-
-            # a name (a[var]) or number (a[5])
+        # bracket notation could be a string (a["b"])
+        if isinstance(self.idx, String):
             return f'get_tabvalue({self.value.dump()}.table, {self.idx.dump()})'
+
+        # a name (a[var]) or number (a[5])
+        return f'get_tabvalue({self.value.dump()}.table, {self.idx.dump()})'
 
     @property
     def type(self):
@@ -412,6 +399,19 @@ class Index(Lhs):
 """ Statements                                                              """
 """ ----------------------------------------------------------------------- """
 
+
+class SetTabValue(Statement):
+    """
+    Used to access set a table's key to a value
+    """
+    def __init__(self, table: Name, key: Expression, value: Expression, **kwargs):
+        super().__init__("SetTabValue", **kwargs)
+        self.table = table
+        self.key = key
+        self.value = value
+
+    def dump(self):
+        return f'set_tabvalue({self.table.dump()}.table, {self.key.dump()}, {self.value.dump()});'
 
 class Assign(Statement):
     """Lua global assignment statement.
@@ -1010,7 +1010,6 @@ class Method(Statement):
         raise ValueError('Should never call dump() on Method')
 
     def replace_with_function_and_assign(self):
-        i = Index(self.name, self.source)
         _args = [Name('self', type=Type.UNKNOWN), Name('function_arguments', type=Type.UNK_PTR)]
         f = Function(Name(f'__{self.source.id}_{self.name.id}'), _args, self.body)
         for arg in self.args:
@@ -1020,7 +1019,7 @@ class Method(Statement):
         for (idx, arg) in enumerate(self.args):
             f.body.body.insert(len(self.args), Assign([arg], [ArrayIndex(Number(idx, ntype=NumberType.BARE_INT), Name('function_arguments'))]));
 
-        a = Assign([i], [f.name])
+        a = SetTabValue(self.source, String(self.name.id), FunctionReference(f.name)) # Assign([i], [f.name])
         a.parent = self.parent
         return f, a
 
@@ -1117,6 +1116,14 @@ class StringDelimiter(Enum):
     DOUBLE_SQUARE = 2  # [[foo]]
 
 
+class FunctionReference(Expression):
+    type = Type.FUNCTION
+    def __init__(self, name: Name, **kwargs):
+        super(FunctionReference, self).__init__("FunctionReference", **kwargs)
+        self.name = name
+    def dump(self):
+        return f"TFUN({self.name.dump()})"
+
 class String(Expression):
     """Define the Lua string expression.
 
@@ -1137,7 +1144,7 @@ class String(Expression):
         self.delimiter: StringDelimiter = delimiter
 
     def dump(self):
-        return f'"{self.s}"'
+        return f'TSTR("{self.s}")'
 
 
 class Field(Expression):

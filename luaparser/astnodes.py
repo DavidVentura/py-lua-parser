@@ -20,18 +20,30 @@ class InplaceOp(Enum):
     DIV      = auto()
 
 class Type(Enum):
-    NUMBER   = auto()
-    STRING   = auto()
-    BOOL     = auto()
-    FUNCTION = auto()
-    NULL     = auto()
-    TABLE    = auto()
-    UNKNOWN  = auto()
+    NUMBER    = auto()
+    STRING    = auto()
+    BOOL      = auto()
+    FUNCTION  = auto()
+    NULL      = auto()
+    TABLE     = auto()
+    TABLE_PTR = auto()
+    UNKNOWN   = auto()
+    UNK_PTR   = auto()
+
+    def _repr(self):
+        if self == Type.UNK_PTR:
+            return 'TValue_t*'
+        if self == Type.TABLE_PTR:
+            return 'Table_t*'
+        return 'TValue_t'
 
 class Node:
     """Base class for AST node."""
 
     def replace_child(self, child, new_child):
+        raise NotImplementedError(f'replace_child is not implemented for {type(self)}')
+
+    def replace_child_multi(self, child, new_child):
         raise NotImplementedError(f'replace_child is not implemented for {type(self)}')
 
     def dump(self):
@@ -210,6 +222,16 @@ class Block(Node):
         self.body[idx] = new_child
         new_child.parent = self
 
+    def replace_child_multi(self, child, new_children: list):
+        if len(new_children) == 0:
+            return
+        idx = self.body.index(child)
+        self.body[idx] = new_children[-1]
+        self.body[idx].parent = self
+        for new_child in new_children[:-1:-1]: # go backwards, skip the last child
+            self.body.insert(idx, new_child)
+            self.body[idx-1].parent = self
+
 
 class Signature(Node):
     """Declares a function's signature."""
@@ -228,15 +250,7 @@ class Declaration(Node):
         self.type = type
 
     def dump(self):
-        t = 'TValue_t';
-        if self.type is Type.NUMBER:
-            t = 'fix32'
-        elif self.type is Type.STRING:
-            t = 'char*'
-        elif self.type is Type.NULL:
-            t = 'void'
-
-        return f'{t} {self.name.id};'
+        return f'{self.type._repr()} {self.name.id};'
 
 class Chunk(Node):
     """Define a Lua chunk.
@@ -276,10 +290,10 @@ class Name(Lhs):
         id (`string`): Id.
     """
 
-    def __init__(self, identifier: str, **kwargs):
+    def __init__(self, identifier: str, type=Type.UNKNOWN, **kwargs):
         super(Name, self).__init__("Name", **kwargs)
         self.id: str = identifier
-        self.type = Type.UNKNOWN
+        self.type = type
 
     def dump(self):
         return self.id
@@ -292,6 +306,25 @@ class IndexNotation(Enum):
     def dump(self):
         return super().dump()
 
+
+class ArrayIndex(Lhs):
+    """
+    Used to access subscripts through an index op after translating to an array:
+    Given `TValue_t* arr = {...};`, this represents `arr[0]`
+    """
+
+    def __init__(
+        self,
+        idx: Expression,
+        value: Name,
+        **kwargs
+    ):
+        super(ArrayIndex, self).__init__("ArrayIndex", **kwargs)
+        self.idx = idx
+        self.value: Expression = value
+
+    def dump(self):
+        return f'{self.value.dump()}[{self.idx.dump()}]'
 
 class Index(Lhs):
     """Define a Lua index expression.
@@ -309,7 +342,7 @@ class Index(Lhs):
         **kwargs
     ):
         super(Index, self).__init__("Index", **kwargs)
-        self.idx: Name = idx
+        self.idx = idx
         self.value: Expression = value
         self.notation: IndexNotation = notation
         if isinstance(idx, String):
@@ -821,14 +854,21 @@ class Call(Statement):
         if self.func.id in scope_ids:
             is_vec = True
         if isinstance(self.func, Index): # table-based calls are always user-defined
-                                         # -> lambdas
             is_vec = True
 
-        args = f'{", ".join(a.dump() for a in self.args)}'
-        if is_vec:
-            args = f'{{{args}}}'
 
-        r = f'''{self.func.dump()}({args})'''
+        if is_vec:
+            # bypass self
+            args = f'{", ".join(a.dump() for a in self.args[1:])}'
+            args = f'{self.args[0].dump()}, (TValue_t[]){{{args}}}'
+        else:
+            args = f'{", ".join(a.dump() for a in self.args)}'
+
+        if isinstance(self.func, Index): # table-based calls are always user-defined
+            r = f'''{self.func.dump()}.fun({args})'''
+        else:
+            r = f'''{self.func.dump()}({args})'''
+
         if isinstance(self.parent, Block):
             r += ';'
 
@@ -894,17 +934,7 @@ class Function(Statement):
 
     @property
     def signature(self):
-        if self.ret_type is Type.NULL:
-            t = 'void'
-        # optimization to do later
-        #elif self.ret_type is Type.NUMBER:
-        #    t = 'fix32'
-        elif self.ret_type in [Type.NUMBER, Type.STRING, Type.BOOL, Type.UNKNOWN]:
-            t = 'TValue_t'
-        else:
-            raise ValueError(f'Unhandled ret type {self.ret_type} for {self.name.id}')
-
-        return f'{t} {self.name.id}({", ".join("TValue_t " + a.dump() for a in self.args)})'
+        return f'{self.ret_type._repr()} {self.name.id}({", ".join(f"{a.type._repr()} " + a.dump() for a in self.args)})'
 
     def dump(self):
         return textwrap.dedent(f'''
@@ -979,13 +1009,20 @@ class Method(Statement):
     def dump(self):
         raise ValueError('Should never call dump() on Method')
 
-    def replace_with_assign(self):
+    def replace_with_function_and_assign(self):
         i = Index(self.name, self.source)
-        _args = [Name('self')] + self.args
-        v = AnonymousFunction(_args, self.body)
-        a = Assign([i], [v])
+        _args = [Name('self', type=Type.UNKNOWN), Name('function_arguments', type=Type.UNK_PTR)]
+        f = Function(Name(f'__{self.source.id}_{self.name.id}'), _args, self.body)
+        for arg in self.args:
+            f.body.body.insert(0, Declaration(arg, Type.UNKNOWN));
+
+        # after args declaration, assign the index value
+        for (idx, arg) in enumerate(self.args):
+            f.body.body.insert(len(self.args), Assign([arg], [ArrayIndex(Number(idx, ntype=NumberType.BARE_INT), Name('function_arguments'))]));
+
+        a = Assign([i], [f.name])
         a.parent = self.parent
-        return a
+        return f, a
 
 
 """ ----------------------------------------------------------------------- """
@@ -1005,7 +1042,7 @@ class Nil(Expression):
         super(Nil, self).__init__("Nil", **kwargs)
 
     def dump(self):
-        return "NUL" # null tvalue
+        return "T_NULL" # null tvalue
 
 
 class TrueExpr(Expression):
@@ -1032,6 +1069,7 @@ class NumberType(Enum):
     INT = auto()
     FLT = auto()
     FIX = auto()
+    BARE_INT = auto()
 
 
 class Number(Expression):
@@ -1056,6 +1094,8 @@ class Number(Expression):
         # 0.5 -> fix32(0.5f)
         if self.ntype is NumberType.FLT:
             return f'TNUM(fix32_from_float({self.n}f))'
+        if self.ntype is NumberType.BARE_INT:
+            return self.n
 
         # 1 -> fix32(1)
         return f'TNUM16({self.n})'

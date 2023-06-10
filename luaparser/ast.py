@@ -336,6 +336,12 @@ class WalkVisitor:
         self.visit(node.value)
         self.visit(node.idx)
 
+    @visitor(ArrayIndex)
+    def visit(self, node):
+        self._nodes.append(node)
+        self.visit(node.value)
+        self.visit(node.idx)
+
     @visitor(Varargs)
     def visit(self, node):
         self._nodes.append(node)

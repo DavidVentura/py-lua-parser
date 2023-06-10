@@ -488,7 +488,7 @@ class Assign(Statement):
             elif t.type is Type.TABLE:
                 r.append(f'{t.id} = {v.dump()};')
             elif t.type is Type.UNKNOWN:
-                r.append(f'{t.dump()} = {v.dump()}; // ?')
+                r.append(f'{t.dump()} = {v.dump()}; // unknown type')
             else:
                 r.append(f'{t.dump()} = {v.dump()};')
         return '\n'.join(r)
@@ -1185,21 +1185,15 @@ class Table(Expression):
     def __init__(self, fields: List[Field], **kwargs):
         super().__init__("Table", **kwargs)
         self.fields: List[Field] = fields
+        for f in self.fields:
+            f.key.parent = self
+            f.value.parent = self
+        self._og_field_count = len(self.fields)
 
 
     def dump(self):
-        if self.fields:
-            # FIXME depends on context now; must be created in scope, then assigned at this point?
-            _field_lines = []
-            target_var = 'T_IDK'
-            if isinstance(self.parent, Assign):
-                target_var = self.parent.targets[0].id
-                assert len(self.parent.targets) == 1, "Not sure which table this is"
-            for f in self.fields:
-                _field_lines.append(f'set_tabvalue({target_var}.table, {f.dump()});')
-            _field_lines = "\n".join(_field_lines)
-            return f'TTAB(make_table(4)); {_field_lines}'
-        return 'TTAB(make_table(4))'
+        assert len(self.fields) == 0, self.fields
+        return f'TTAB(make_table({self._og_field_count}))'
 
 
 class Dots(Expression):

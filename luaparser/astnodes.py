@@ -857,15 +857,8 @@ class Call(Statement):
     def dump(self):
         # FIXME: finding "name in all scopes recursively going up" should be a thing
         is_vec = False
-        if isinstance(self.scope().scope().body, Method):
-            scope_ids = [n.id for n in self.scope().scope().vars]
-        else:
-            scope_ids = [n.id for n in self.scope().scope().body.vars]
-        if self.func.id in scope_ids:
-            is_vec = True
-        if isinstance(self.func, Index): # table-based calls are always user-defined
-            is_vec = True
-
+        _builtins = ['print', 'flr']
+        self.is_builtin = self.func and isinstance(self.func, Name) and self.func.id in _builtins
 
         if is_vec:
             # bypass self
@@ -874,9 +867,11 @@ class Call(Statement):
         else:
             args = f'{", ".join(a.dump() for a in self.args)}'
 
-        if isinstance(self.func, Index): # table-based calls are always user-defined
+        if not self.is_builtin:
+            args = f'(TValue_t[]){{ {args} }}'
             r = f'''{self.func.dump()}.fun({args})'''
         else:
+            # Not passing args as array
             r = f'''{self.func.dump()}({args})'''
 
         if isinstance(self.parent, Block):
@@ -1019,20 +1014,6 @@ class Method(Statement):
 
     def dump(self):
         raise ValueError('Should never call dump() on Method')
-
-    def replace_with_function_and_assign(self):
-        _args = [Name('self', type=Type.UNKNOWN), Name('function_arguments', type=Type.UNK_PTR)]
-        f = Function(Name(f'__{self.source.id}_{self.name.id}'), _args, self.body)
-        for arg in self.args:
-            f.body.body.insert(0, Declaration(arg, Type.UNKNOWN));
-
-        # after args declaration, assign the index value
-        for (idx, arg) in enumerate(self.args):
-            f.body.body.insert(len(self.args), Assign([arg], [ArrayIndex(Number(idx, ntype=NumberType.BARE_INT), Name('function_arguments'))]));
-
-        a = SetTabValue(self.source, String(self.name.id), FunctionReference(f.name)) # Assign([i], [f.name])
-        a.parent = self.parent
-        return f, a
 
 
 """ ----------------------------------------------------------------------- """

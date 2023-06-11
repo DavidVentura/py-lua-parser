@@ -91,6 +91,14 @@ class Node:
     def __eq__(self, other) -> bool:
         if self.__class__ != other.__class__:
             return False
+        keys = [k for k in dir(self) if not k.startswith("_")]
+        for k in keys:
+            if k in ["parent"]: continue
+            if getattr(self, k) != getattr(other, k):
+                return False
+        # if all keys match, still depends on token position
+        # this covers bad usage of _first_token / _last_token
+        # while also rejecting clearly different objects
         return self._first_token == other._first_token and self._last_token == other._last_token
 
     @property

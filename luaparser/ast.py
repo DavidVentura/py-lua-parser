@@ -375,6 +375,10 @@ class WalkVisitor:
     def visit(self, node):
         self._nodes.append(node)
 
+    @visitor(Comment)
+    def visit(self, node):
+        self._nodes.append(node)
+
 
 class SyntaxException(Exception):
     pass

@@ -176,7 +176,9 @@ class Comment(Node):
         self.is_multi_line: bool = is_multi_line
 
     def dump(self):
-        pass
+        if self.is_multi_line:
+            return f"/* {self.s} */"
+        return f"// {self.s}"
 
 
 class Statement(Node):

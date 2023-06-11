@@ -84,6 +84,9 @@ class Node:
             self._last_token = self._last_token.clone()
             self._last_token.source = CommonToken.EMPTY_SOURCE
 
+    def set_parent_on_children(self):
+        pass
+
     @property
     def display_name(self) -> str:
         return self._name
@@ -365,6 +368,10 @@ class Index(Lhs):
         self.optimized_access = False
 
 
+    def set_parent_on_children(self):
+        self.value.parent = self
+        self.idx.parent = self
+
     def dump_write(self, op: str, value: str):
         # a.t->set(FIELD___INDEX, a); // ?
         if isinstance(self.idx, String):
@@ -546,9 +553,6 @@ class LocalAssign(Assign):
         super().__init__(targets, values, **kwargs)
         self._name: str = "LocalAssign"
         self.local: bool = True
-
-    def dump(self):
-        return super().dump()
 
 
 class While(Statement):
@@ -857,7 +861,7 @@ class Call(Statement):
     def dump(self):
         # FIXME: finding "name in all scopes recursively going up" should be a thing
         is_vec = False
-        _builtins = ['print', 'flr']
+        _builtins = ['print', 'flr', 'free_tvalue']
         self.is_builtin = self.func and isinstance(self.func, Name) and self.func.id in _builtins
 
         if is_vec:
@@ -1184,7 +1188,7 @@ class Table(Expression):
 
 
     def dump(self):
-        assert len(self.fields) == 0, self.fields
+        #assert len(self.fields) == 0, self.fields
         return f'TTAB(make_table({self._og_field_count}))'
 
 

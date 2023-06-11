@@ -545,6 +545,18 @@ class LuaOutputVisitor:
     def visit(self, node) -> str:
         return "#" + self.visit(node.operand)
 
+    @visitor(Comment)
+    def visit(self, node: Comment) -> str:
+        return "-- " + self.visit(node.s)
+
+    @visitor(SetTabValue)
+    def visit(self, node: SetTabValue) -> str:
+        return f"{node.table.id}.['{node.key.dump()}'] = {node.value}"
+
+    @visitor(FunctionReference)
+    def visit(self, node: FunctionReference) -> str:
+        return self.visit(node.name)
+
     @visitor(Name)
     def visit(self, node: Name) -> str:
         return self.visit(node.id)

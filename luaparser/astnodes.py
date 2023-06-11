@@ -920,11 +920,12 @@ class Function(Statement):
         body (`Block`): List of statements to execute.
     """
 
-    def __init__(self, name: Expression, args: List[Expression], body: Block, **kwargs):
+    def __init__(self, name: Expression, args: List[Expression], body: Block, is_dyncalled=False, **kwargs):
         super(Function, self).__init__("Function", **kwargs)
         self.name: Expression = name
         self.args: List[Expression] = args
         self.body: Block = body
+        self.is_dyncalled = is_dyncalled
 
         for a in self.args:
             a.parent = self
@@ -1230,20 +1231,7 @@ class AnonymousFunction(Expression):
         self.body: Block = body
 
     def dump(self):
-        for a in self.args:
-            assert isinstance(a, Name)
-        args = '\n'.join(f'TValue {a.id} = get_with_default(args, {idx});' for idx, a in enumerate(self.args))
-
-        # Lift all closures to:
-        # - Be declared as a regular, top-level function
-        # - Read/Write _enclosed_ variables from UpValue table
-        #   - How to know when it's an UpValue ???
-        return f'''
-        TValue([&](std::vector<TValue> args) -> TValue {{
-            {args}
-            {NEWLINE.join(s.dump() for s in self.body.body)}
-        }})
-    '''
+        assert False, "Should never call dump() on AnonymousFunction"
 
 
 """ ----------------------------------------------------------------------- """

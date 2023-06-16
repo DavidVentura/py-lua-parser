@@ -365,7 +365,6 @@ class Index(Lhs):
         else:
             self.id = idx.id
         self.value.type = Type.TABLE  # anything accessed via a lookup is a table
-        self.optimized_access = False
 
 
     def set_parent_on_children(self):
@@ -383,17 +382,6 @@ class Index(Lhs):
         return f'{self.value.dump()}.table->{op}({field_name}, {value});'
 
     def dump(self):
-        if self.optimized_access:
-            if isinstance(self.idx, String):
-                _name = self.idx.s
-            else:
-                _name = self.idx.dump()
-            field_name = f'FIELD_{_name.upper()}'
-
-            if isinstance(self.parent, Assign):
-                assert False, "Should never call dump() on Index from Assign"
-            return f'OPTIMIZEDget_tabvalue({self.value.dump()}, {field_name})'
-
         if isinstance(self.parent, Assign) and self in self.parent.targets:
             assert False, "This should've been replaced with SetTabValue"
 
@@ -500,9 +488,7 @@ class Assign(Statement):
             t = self.targets[i]
             v = self.values[i]
 
-            if isinstance(t, Index) and t.optimized_access:
-                r.append(t.dump_write('set', v.dump()))
-            elif t.type is Type.TABLE:
+            if t.type is Type.TABLE:
                 r.append(f'{t.id} = {v.dump()};')
             elif t.type is Type.UNKNOWN:
                 r.append(f'{t.dump()} = {v.dump()}; // unknown type')
@@ -521,23 +507,14 @@ class IAssign(Statement):
         self.value.parent = self
 
     def dump(self):
-        if isinstance(self.target, Index):
-            # b.t->x += fix32(5)
-            # ->
-            # b.t->inc(FIELD_X, fix32(5));
-            _map = {InplaceOp.ADD: 'inc',
-                    InplaceOp.SUB: 'sub',
-                    InplaceOp.MUL: 'mul',
-                    InplaceOp.DIV: 'div',
-                    }
-            return  self.target.dump_write(_map[self.op], self.value.dump())
-
+        #if isinstance(self.target, Index):
+        # ?
         _map = {InplaceOp.ADD:  '_pluseq',
                 InplaceOp.SUB:  '_minuseq',
                 InplaceOp.MUL: '_muleq',
                 InplaceOp.DIV:  '_diveq',
                 }
-        return f'{_map[self.op]}(&{self.target.dump()}, {self.value.dump()});'
+        return f'{_map[self.op]}(&({self.target.dump()}), {self.value.dump()});'
 
 
 

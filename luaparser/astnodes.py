@@ -44,7 +44,7 @@ class Node:
         raise NotImplementedError(f'replace_child is not implemented for {type(self)}')
 
     def replace_child_multi(self, child, new_child):
-        raise NotImplementedError(f'replace_child is not implemented for {type(self)}')
+        raise NotImplementedError(f'replace_child_multi is not implemented for {type(self)}')
 
     def dump(self):
         raise NotImplementedError(f'dump is not implemented for {type(self)}')
@@ -563,6 +563,13 @@ class IAssign(Statement):
         self.target.parent = self
         self.value.parent = self
 
+    def replace_child(self, child, new_child):
+        new_child.parent = self
+        if self.target == child:
+            self.target = new_child
+        if self.value == child:
+            self.value = new_child
+
     def dump(self):
         #if isinstance(self.target, Index):
         # ?
@@ -896,7 +903,7 @@ class Call(Statement):
         # FIXME: finding "name in all scopes recursively going up" should be a thing
         is_vec = False
         _builtins = ['print', 'flr', 'free_tvalue', 'rnd', 'btn', 'foreach', 'cls', 'spr', 'add', 'del',
-                     'getmetatable', 'setmetatable', 'count']
+                     'getmetatable', 'setmetatable', 'count', '_sqr', '_sqrt']
         self.is_builtin = self.func and isinstance(self.func, Name) and self.func.id in _builtins
 
         if is_vec:
@@ -982,6 +989,7 @@ class Function(Statement):
         return f'{self.ret_type._repr()} {self.name.id}({", ".join(f"{a.type._repr()} " + a.dump() for a in self.args)})'
 
     def dump(self):
+        assert not isinstance(self.name, Index), "Should never dump() a Function with Index name"
         return textwrap.dedent(f'''
          {self.signature} {{
             {NEWLINE.join(s.dump() for s in self.body.body)}

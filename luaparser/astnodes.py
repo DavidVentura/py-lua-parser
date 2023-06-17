@@ -1219,12 +1219,12 @@ class Table(Expression):
         for f in self.fields:
             f.key.parent = self
             f.value.parent = self
-        self._og_field_count = len(self.fields)
+
+        self.field_names = {f.key.dump() for f in self.fields}
 
 
     def dump(self):
-        #assert len(self.fields) == 0, self.fields
-        return f'TTAB(make_table({self._og_field_count}))'
+        return f'TTAB(make_table({len(self.field_names)}))'
 
 
 class Dots(Expression):

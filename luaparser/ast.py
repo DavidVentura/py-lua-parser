@@ -187,6 +187,13 @@ class WalkVisitor:
         self.visit(node.key)
         self.visit(node.value)
 
+    @visitor(IAddTab)
+    def visit(self, node):
+        self._nodes.append(node)
+        self.visit(node.table)
+        self.visit(node.key)
+        self.visit(node.value)
+
     @visitor(While)
     def visit(self, node):
         self._nodes.append(node)

@@ -311,7 +311,6 @@ class Name(Lhs):
     def dump(self):
         return self.id
 
-
 class IndexNotation(Enum):
     DOT = 0  # obj.foo
     SQUARE = 1  # obj[foo]
@@ -378,23 +377,25 @@ class Index(Lhs):
         else:
             _name = self.idx.dump()
         field_name = f'FIELD_{_name.upper()}'
-        return f'NOT_USED_set_tabvalue({self.value.dump()}.table, {field_name}, {value});'
+        return f'NOT_USED_set_tabvalue({self.value.dump()}, {field_name}, {value});'
         return f'{self.value.dump()}.table->{op}({field_name}, {value});'
 
     def dump(self):
         if isinstance(self.parent, Assign) and self in self.parent.targets:
             assert False, "This should've been replaced with SetTabValue"
+        if isinstance(self.parent, IAssign) and self == self.parent.target:
+            assert False, "This should've been replaced with SetTabValue"
 
         if self.notation == IndexNotation.DOT:
             # DOT notation (a.b) is always a string (a["b"])
-            return f'get_tabvalue({self.value.dump()}.table, TSTR("{self.idx.dump()}"))'
+            return f'get_tabvalue({self.value.dump()}, TSTR("{self.idx.dump()}"))'
 
         # bracket notation could be a string (a["b"])
         if isinstance(self.idx, String):
-            return f'get_tabvalue({self.value.dump()}.table, {self.idx.dump()})'
+            return f'get_tabvalue({self.value.dump()}, {self.idx.dump()})'
 
         # a name (a[var]) or number (a[5])
-        return f'get_tabvalue({self.value.dump()}.table, {self.idx.dump()})'
+        return f'get_tabvalue({self.value.dump()}, {self.idx.dump()})'
 
     @property
     def type(self):
@@ -416,7 +417,21 @@ class SetTabValue(Statement):
         self.value = value
 
     def dump(self):
-        return f'set_tabvalue({self.table.dump()}.table, {self.key.dump()}, {self.value.dump()});'
+        return f'set_tabvalue({self.table.dump()}, {self.key.dump()}, {self.value.dump()});'
+
+
+class IAddTab(Statement):
+    """
+    Used to access set a table's key to a value
+    """
+    def __init__(self, table: Name, key: Expression, value: Expression, **kwargs):
+        super().__init__("IAddTab", **kwargs)
+        self.table = table
+        self.key = key
+        self.value = value
+
+    def dump(self):
+        return f'iadd_tab({self.table.dump()}, {self.key.dump()}, {self.value.dump()});'
 
 class Assign(Statement):
     """Lua global assignment statement.
@@ -509,12 +524,12 @@ class IAssign(Statement):
     def dump(self):
         #if isinstance(self.target, Index):
         # ?
-        _map = {InplaceOp.ADD:  '_pluseq',
-                InplaceOp.SUB:  '_minuseq',
+        _map = {InplaceOp.ADD: '_pluseq',
+                InplaceOp.SUB: '_minuseq',
                 InplaceOp.MUL: '_muleq',
-                InplaceOp.DIV:  '_diveq',
+                InplaceOp.DIV: '_diveq',
                 }
-        return f'{_map[self.op]}(&({self.target.dump()}), {self.value.dump()});'
+        return f'{_map[self.op]}(&{self.target.dump()}, {self.value.dump()});'
 
 
 
@@ -851,7 +866,7 @@ class Call(Statement):
 
         if not self.is_builtin:
             args = f'(TValue_t[]){{ {args} }}'
-            r = f'''{self.func.dump()}.fun({args})'''
+            r = f'''CALL(({self.func.dump()}), ({args}))'''
         else:
             # Not passing args as array
             r = f'''{self.func.dump()}({args})'''

@@ -194,6 +194,27 @@ class WalkVisitor:
         self.visit(node.key)
         self.visit(node.value)
 
+    @visitor(ISubTab)
+    def visit(self, node):
+        self._nodes.append(node)
+        self.visit(node.table)
+        self.visit(node.key)
+        self.visit(node.value)
+
+    @visitor(IMulTab)
+    def visit(self, node):
+        self._nodes.append(node)
+        self.visit(node.table)
+        self.visit(node.key)
+        self.visit(node.value)
+
+    @visitor(IDivTab)
+    def visit(self, node):
+        self._nodes.append(node)
+        self.visit(node.table)
+        self.visit(node.key)
+        self.visit(node.value)
+
     @visitor(While)
     def visit(self, node):
         self._nodes.append(node)

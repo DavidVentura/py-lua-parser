@@ -433,6 +433,48 @@ class IAddTab(Statement):
     def dump(self):
         return f'iadd_tab({self.table.dump()}, {self.key.dump()}, {self.value.dump()});'
 
+
+class ISubTab(Statement):
+    """
+    Used to access set a table's key to a value
+    """
+    def __init__(self, table: Name, key: Expression, value: Expression, **kwargs):
+        super().__init__("ISubTab", **kwargs)
+        self.table = table
+        self.key = key
+        self.value = value
+
+    def dump(self):
+        return f'isub_tab({self.table.dump()}, {self.key.dump()}, {self.value.dump()});'
+
+
+class IMulTab(Statement):
+    """
+    Used to access set a table's key to a value
+    """
+    def __init__(self, table: Name, key: Expression, value: Expression, **kwargs):
+        super().__init__("IMulTab", **kwargs)
+        self.table = table
+        self.key = key
+        self.value = value
+
+    def dump(self):
+        return f'imul_tab({self.table.dump()}, {self.key.dump()}, {self.value.dump()});'
+
+
+class IDivTab(Statement):
+    """
+    Used to access set a table's key to a value
+    """
+    def __init__(self, table: Name, key: Expression, value: Expression, **kwargs):
+        super().__init__("IDivTab", **kwargs)
+        self.table = table
+        self.key = key
+        self.value = value
+
+    def dump(self):
+        return f'idiv_tab({self.table.dump()}, {self.key.dump()}, {self.value.dump()});'
+
 class Assign(Statement):
     """Lua global assignment statement.
 
@@ -854,7 +896,7 @@ class Call(Statement):
         # FIXME: finding "name in all scopes recursively going up" should be a thing
         is_vec = False
         _builtins = ['print', 'flr', 'free_tvalue', 'rnd', 'btn', 'foreach', 'cls', 'spr', 'add', 'del',
-                     'getmetatable', 'setmetatable',]
+                     'getmetatable', 'setmetatable', 'count']
         self.is_builtin = self.func and isinstance(self.func, Name) and self.func.id in _builtins
 
         if is_vec:

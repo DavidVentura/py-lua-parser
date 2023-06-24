@@ -20,21 +20,24 @@ class InplaceOp(Enum):
     DIV      = auto()
 
 class Type(Enum):
-    NUMBER    = auto()
-    STRING    = auto()
-    BOOL      = auto()
-    FUNCTION  = auto()
-    NULL      = auto()
-    TABLE     = auto()
-    TABLE_PTR = auto()
-    UNKNOWN   = auto()
-    UNK_PTR   = auto()
+    BARE_NUMBER     = auto()
+    NUMBER          = auto()
+    STRING          = auto()
+    BOOL            = auto()
+    FUNCTION        = auto()
+    NULL            = auto()
+    TABLE           = auto()
+    TABLE_PTR       = auto()
+    UNKNOWN         = auto()
+    UNK_PTR         = auto()
 
     def _repr(self):
         if self == Type.UNK_PTR:
             return 'TValue_t*'
         if self == Type.TABLE_PTR:
             return 'Table_t*'
+        if self == Type.BARE_NUMBER:
+            return 'uint8_t'
         return 'TValue_t'
 
 class Node:
@@ -332,14 +335,16 @@ class ArrayIndex(Lhs):
         self,
         idx: Expression,
         value: Name,
+        array_len_var: Name,
         **kwargs
     ):
         super(ArrayIndex, self).__init__("ArrayIndex", **kwargs)
         self.idx = idx
         self.value: Expression = value
+        self.array_len_var = array_len_var
 
     def dump(self):
-        return f'{self.value.dump()}[{self.idx.dump()}]'
+        return f'__get_array_index_capped({self.value.dump()}, {self.array_len_var.dump()}, {self.idx.dump()})'
 
 class Index(Lhs):
     """Define a Lua index expression.

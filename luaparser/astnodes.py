@@ -910,9 +910,10 @@ class Call(Statement):
     def dump(self):
         # FIXME: finding "name in all scopes recursively going up" should be a thing
         is_vec = False
-        _builtins = ['print', 'flr', 'free_tvalue', 'rnd', 'btn', 'foreach', 'cls', 'spr', 'add', 'del',
+        _builtins = ['print', 'flr', 'rnd', 'foreach', 'add', 'del',
                      'getmetatable', 'setmetatable', 'count', '_sqr', '_sqrt',
                      'tostring',
+                     '_draw', '_update', '_update60',
                      ]
         self.is_builtin = self.func and isinstance(self.func, Name) and (self.func.id in _builtins or self.func.id.startswith("__internal_debug_"))
 

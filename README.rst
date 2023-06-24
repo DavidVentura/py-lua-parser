@@ -267,3 +267,11 @@ Will output:
             }
         }
     }
+
+
+Regenerating Grammar
+====================
+
+.. code-block:: bash
+    antlr4 -Dlanguage=Python3 ./Lua.g4
+

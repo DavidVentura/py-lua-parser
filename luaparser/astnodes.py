@@ -222,8 +222,8 @@ class Block(Node):
     def dump(self):
         return '\n'.join(s.dump() for s in self.body)
 
-    def add_declaration(self, n: Node):
-        self.body.insert(0, Declaration(n, Type.UNKNOWN))
+    def add_declaration(self, n: Node, is_local: bool):
+        self.body.insert(0, Declaration(n, Type.UNKNOWN, is_local))
         self.vars.append(n)
 
     def add_signatures(self, f: 'Function'):
@@ -257,13 +257,16 @@ class Signature(Node):
 
 class Declaration(Node):
     """Declares a variable with type"""
-    def __init__(self, name: 'Name', type: Type, **kwargs):
+    def __init__(self, name: 'Name', type: Type, is_local: bool, **kwargs):
         super(Declaration, self).__init__("Declaration", **kwargs)
         self.name = name
         self.type = type
+        self.is_local = is_local
 
     def dump(self):
-        return f'{self.type._repr()} {self.name.id};'
+        if self.is_local:
+            return f'{self.type._repr()} gc {self.name.id} = T_NULL;'
+        return f'{self.type._repr()} {self.name.id} = T_NULL;'
 
 class Chunk(Node):
     """Define a Lua chunk.
@@ -280,8 +283,8 @@ class Chunk(Node):
     def dump(self):
         pass
 
-    def add_declaration(self, n: Node):
-        self.body.body.insert(0, Declaration(n, Type.UNKNOWN))
+    def add_declaration(self, n: Node, is_local: bool):
+        self.body.body.insert(0, Declaration(n, Type.UNKNOWN, is_local))
 
 
 """
@@ -995,8 +998,8 @@ class Function(Statement):
             {NEWLINE.join(s.dump() for s in self.body.body)}
         }}''')
 
-    def add_declaration(self, n: Node):
-        self.body.body.insert(0, Declaration(n, Type.UNKNOWN))
+    def add_declaration(self, n: Node, is_local: bool):
+        self.body.body.insert(0, Declaration(n, Type.UNKNOWN, is_local))
 
 
 class LocalFunction(Function):

@@ -554,11 +554,11 @@ class Assign(Statement):
             v = self.values[i]
 
             if t.type is Type.TABLE:
-                r.append(f'{t.id} = {v.dump()};')
+                r.append(f'_set(&{t.id}, {v.dump()});')
             elif t.type is Type.UNKNOWN:
-                r.append(f'{t.dump()} = {v.dump()}; // unknown type')
+                r.append(f'_set(&{t.dump()}, {v.dump()}); // unknown type')
             else:
-                r.append(f'{t.dump()} = {v.dump()};')
+                r.append(f'_set(&{t.dump()}, {v.dump()});')
         return '\n'.join(r)
 
 class IAssign(Statement):

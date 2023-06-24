@@ -911,8 +911,10 @@ class Call(Statement):
         # FIXME: finding "name in all scopes recursively going up" should be a thing
         is_vec = False
         _builtins = ['print', 'flr', 'free_tvalue', 'rnd', 'btn', 'foreach', 'cls', 'spr', 'add', 'del',
-                     'getmetatable', 'setmetatable', 'count', '_sqr', '_sqrt']
-        self.is_builtin = self.func and isinstance(self.func, Name) and self.func.id in _builtins
+                     'getmetatable', 'setmetatable', 'count', '_sqr', '_sqrt',
+                     'tostring',
+                     ]
+        self.is_builtin = self.func and isinstance(self.func, Name) and (self.func.id in _builtins or self.func.id.startswith("__internal_debug_"))
 
         if is_vec:
             # bypass self

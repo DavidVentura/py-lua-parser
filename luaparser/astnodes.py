@@ -926,13 +926,16 @@ class Call(Statement):
         if is_vec:
             # bypass self
             args = f'{", ".join(a.dump() for a in self.args[1:])}'
-            args = f'{self.args[0].dump()}, (TValue_t[]){{{args}}}'
+            args = f'{self.args[0].dump()}, (TValue_t[{len(self.args)}]){{{args}}}'
         else:
             args = f'{", ".join(a.dump() for a in self.args)}'
 
         if not self.is_builtin:
-            args = f'(TValue_t[]){{ {args} }}'
-            r = f'''CALL(({self.func.dump()}), ({args}))'''
+            args = f'(TValue_t[{len(self.args)}]){{ {args} }}'
+            if len(self.args) == 0:
+                r = f'''CALL(({self.func.dump()}), {len(self.args)}, NULL)'''
+            else:
+                r = f'''CALL(({self.func.dump()}), {len(self.args)}, ({args}))'''
         else:
             # Not passing args as array
             r = f'''{self.func.dump()}({args})'''

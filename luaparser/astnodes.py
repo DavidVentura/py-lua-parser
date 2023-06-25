@@ -854,7 +854,7 @@ class Fornum(Statement):
         self.body.parent = self
 
     def dump(self):
-        return f'''for(TValue_t {self.target.dump()} = {self.start.dump()}; _lt({self.target.dump()}, {self.stop.dump()}); {self.target.dump()} = _add({self.target.dump()}, {self.step.dump()})) {{
+        return f'''for(TValue_t {self.target.dump()} = {self.start.dump()}; __bool(_lt({self.target.dump()}, {self.stop.dump()})); {self.target.dump()} = _add({self.target.dump()}, {self.step.dump()})) {{
             {NEWLINE.join(s.dump() for s in self.body.body)}
         }}'''
 
@@ -916,10 +916,11 @@ class Call(Statement):
     def dump(self):
         # FIXME: finding "name in all scopes recursively going up" should be a thing
         is_vec = False
-        _builtins = ['print', 'flr', 'rnd', 'foreach', 'add', 'del',
+        _builtins = ['printh', 'flr', 'rnd', 'foreach', 'add', 'del',
                      'getmetatable', 'setmetatable', 'count', '_sqr', '_sqrt',
                      'tostring',
                      '_draw', '_update', '_update60',
+                     '_and', '_or',
                      ]
         self.is_builtin = self.func and isinstance(self.func, Name) and (self.func.id in _builtins or self.func.id.startswith("__internal_debug_"))
 
@@ -1407,7 +1408,7 @@ class ModOp(AriOp):
         super().__init__("ModOp", left, right, **kwargs)
 
     def dump(self):
-        return f'({self.left.dump()} % {self.right.dump()})'
+        return f'_mod({self.left.dump()}, {self.right.dump()})'
 
 
 class ExpoOp(AriOp):
@@ -1620,7 +1621,6 @@ class AndLoOp(LoOp):
         super().__init__("LAndOp", left, right, **kwargs)
 
     def dump(self):
-        return f'({self.left.dump()} && {self.right.dump()})'
         return f'_and({self.left.dump()}, {self.right.dump()})'
 
 

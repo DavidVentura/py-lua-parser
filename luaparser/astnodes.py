@@ -508,6 +508,9 @@ class Assign(Statement):
         for v in self.values:
             v.parent = self
 
+        if len(self.values) == 0:
+            # local a
+            return
         # TODO a, b = c()
         assert len(self.targets) == len(self.values)
 
@@ -547,6 +550,9 @@ class Assign(Statement):
 
     def dump(self):
         # TODO: multi assign
+        if len(self.values) == 0:
+            # `local a`
+            return ''
         assert len(self.targets) == len(self.values)
         r = []
         for i in range(0, len(self.targets)):

@@ -740,6 +740,14 @@ class If(Statement):
                 }}'''
         return cond_arm + else_arm
 
+    def add_declaration(self, n: Node, is_local: bool):
+        self.body.body.insert(0, Declaration(n, Type.UNKNOWN, is_local))
+
+    def replace_child(self, child, new_child):
+        new_child.parent = self
+        if self.test == child:
+            self.test = new_child 
+
 
 class Label(Statement):
     """Define the label lua statement.

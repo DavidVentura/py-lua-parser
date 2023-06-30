@@ -862,7 +862,7 @@ class Fornum(Statement):
         self.body.parent = self
 
     def dump(self):
-        return f'''for(TValue_t {self.target.dump()} = {self.start.dump()}; __bool(_lt({self.target.dump()}, {self.stop.dump()})); {self.target.dump()} = _add({self.target.dump()}, {self.step.dump()})) {{
+        return f'''for(TValue_t {self.target.dump()} = {self.start.dump()}; __bool(_leq({self.target.dump()}, {self.stop.dump()})); {self.target.dump()} = _add({self.target.dump()}, {self.step.dump()})) {{
             {NEWLINE.join(s.dump() for s in self.body.body)}
         }}'''
 
@@ -912,9 +912,6 @@ class Call(Statement):
         self.func: Expression = func
         self.args: List[Expression] = args
         self.type = Type.UNKNOWN
-        # TODO propagate type information from func definition
-        #if self.func and self.func.id == 'flr':
-        #    self.type = Type.NUMBER
 
         if func:
             self.func.parent = self
@@ -922,32 +919,35 @@ class Call(Statement):
             a.parent = self
 
     def dump(self):
-        # FIXME: finding "name in all scopes recursively going up" should be a thing
-        is_vec = False
+        # "builtins" are called directly, with an exact number of arguments.
         _builtins = ['printh', 'flr', 'rnd', 'foreach', 'add', 'del',
                      'getmetatable', 'setmetatable', 'count', '_sqr', '_sqrt',
                      'tostring',
                      '_draw', '_update', '_update60',
                      '_and', '_or',
+                     'cos', 'sin', 
                      ]
-        self.is_builtin = self.func and isinstance(self.func, Name) and (self.func.id in _builtins or self.func.id.startswith("__internal_debug_"))
+        _pico8_functions = ['cls', 'spr', 'map', 'btn', 'print', 'cos', 'pal', 'sin', 'palt',
+                            'ovalfill', 'oval', 'circ', 'circfill', 'rect', 'rectfill', 'line',
+                            ]
+        is_builtin = False
+        is_pico8 = False
+        if self.func and isinstance(self.func, Name):
+            is_builtin = self.func.id in _builtins or self.func.id.startswith("__internal_debug_")
+            is_pico8 = self.func.id in _pico8_functions
 
-        if is_vec:
-            # bypass self
-            args = f'{", ".join(a.dump() for a in self.args[1:])}'
-            args = f'{self.args[0].dump()}, (TValue_t[{len(self.args)}]){{{args}}}'
-        else:
-            args = f'{", ".join(a.dump() for a in self.args)}'
+        args = f'{", ".join(a.dump() for a in self.args)}'
 
-        if not self.is_builtin:
+        prefix = 'pico8.' if is_pico8 else ''
+        if not is_builtin:
             args = f'(TValue_t[{len(self.args)}]){{ {args} }}'
             if len(self.args) == 0:
-                r = f'''CALL(({self.func.dump()}), {len(self.args)}, NULL)'''
+                r = f'''CALL(({prefix}{self.func.dump()}), {len(self.args)}, NULL)'''
             else:
-                r = f'''CALL(({self.func.dump()}), {len(self.args)}, ({args}))'''
+                r = f'''CALL(({prefix}{self.func.dump()}), {len(self.args)}, ({args}))'''
         else:
             # Not passing args as array
-            r = f'''{self.func.dump()}({args})'''
+            r = f'''{prefix}{self.func.dump()}({args})'''
 
         if isinstance(self.parent, Block):
             r += ';'
@@ -1212,7 +1212,8 @@ class String(Expression):
         self.delimiter: StringDelimiter = delimiter
 
     def dump(self):
-        return f'TSTR("{self.s}")'
+        _s = self.s.replace(r'\^', chr(6))
+        return f'TSTR("{_s}")'
 
 
 class Field(Expression):

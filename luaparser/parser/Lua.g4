@@ -385,11 +385,12 @@ fragment BinaryExponent
 
 fragment EscapeSequence
   : '\\'
-  ( ('a' | 'b' | 'f' | 'n' | 'r' | 't' | 'v' | '\\' | '"' | '\'' | 'z' | LineBreak)
+  ( ('^t' | '^w' | 'a' | 'b' | 'f' | 'n' | 'r' | 't' | 'v' | '\\' | '"' | '\'' | 'z' | LineBreak)
   | Digit (Digit Digit?)?
   | 'x' HexDigit HexDigit
   )
   ;
+// "\^t\^wdouble-double"
 
 fragment LineBreak
   : '\r'? '\n'

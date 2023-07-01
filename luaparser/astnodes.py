@@ -1235,11 +1235,17 @@ class Table(Expression):
             f.key.parent = self
             f.value.parent = self
 
-        self.field_names = {f.key.dump() for f in self.fields}
+        self.field_names = list({f.key.dump() for f in self.fields})
 
 
     def dump(self):
         return f'TTAB(make_table({len(self.field_names)}))'
+
+    def replace_child(self, child, new_child):
+        new_child.parent = self
+        for f in self.fields:
+            if f.value == child:
+                f.value = new_child
 
 
 class Dots(Expression):

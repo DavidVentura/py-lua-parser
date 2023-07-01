@@ -687,6 +687,9 @@ class ElseIf(Statement):
     def dump(self):
         return super().dump()
 
+    def add_declaration(self, n: Node, is_local: bool):
+        self.body.body.insert(0, Declaration(n, Type.UNKNOWN, is_local))
+
 
 class If(Statement):
     """Lua if statement.
@@ -778,6 +781,7 @@ class SemiColon(Statement):
         super(SemiColon, self).__init__("SemiColon", **kwargs)
 
     def dump(self):
+        return ""
         return super().dump()
 
 
@@ -788,6 +792,7 @@ class Break(Statement):
         super(Break, self).__init__("Break", **kwargs)
 
     def dump(self):
+        return "break;"
         return super().dump()
 
 

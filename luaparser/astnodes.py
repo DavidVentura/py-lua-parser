@@ -711,20 +711,12 @@ class If(Statement):
             self.orelse.parent = self
 
     def dump(self):
-        if isinstance(self.test, ULNotOp):
-            _check = '!_bool'
-        else:
-            _check = '_bool'
         cond_arm = f'''
-        if ({_check}({self.test.dump()})) {{
+        if (_bool({self.test.dump()})) {{
         {self.body.dump()}
         }}'''
         if isinstance(self.orelse, ElseIf):
-            if isinstance(self.orelse.test, ULNotOp):
-                _check = '!_bool'
-            else:
-                _check = '_bool'
-            else_arm = f'''else if ({_check}({self.orelse.test.dump()})) {{
+            else_arm = f'''else if (_bool({self.orelse.test.dump()})) {{
             {self.orelse.body.dump()}
             }}
             '''
@@ -1725,7 +1717,7 @@ class ULNotOp(UnaryOp):
         super().__init__("ULNotOp", operand, **kwargs)
 
     def dump(self):
-        return f'{self.operand.dump()}'
+        return f'_not({self.operand.dump()})'
 
 
 """ ----------------------------------------------------------------------- """

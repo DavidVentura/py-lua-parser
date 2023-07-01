@@ -803,12 +803,7 @@ class Return(Statement):
         self.values = values
         for v in values:
             v.parent = self
-
-        if len(values) == 0:
-            self.type = Type.NULL
-
-        if len(values) == 1:
-            self.type = values[0].type
+        self.type = Type.NULL
 
     def dump(self):
         if len(self.values) == 0:
@@ -993,17 +988,7 @@ class Function(Statement):
             a.parent = self
 
         self.body.parent = self
-        self.ret_type = '??'  # TODO - return + variable type analysis
-
-        types = set()
-        for expr in self.body.body:
-            if isinstance(expr, Return):
-                types.add(expr.type)
-
-        if len(types) == 0:
-            self.ret_type = Type.NULL
-        if len(types) == 1:
-            self.ret_type = types.pop()
+        self.ret_type = Type.NULL
 
     @property
     def signature(self):

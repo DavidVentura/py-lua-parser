@@ -556,7 +556,8 @@ class Builder:
                 self.next_is_rc(Tokens.SEMCOL)
 
             self.success()
-            return Return(expr_list, first_token=t, last_token=self._LT)
+            # expr_list is `False` when dealing with bare returns (`return`)
+            return Return(expr_list or [], first_token=t, last_token=self._LT)
         return self.failure()
 
     def parse_inplace_op(self) -> Assign or bool:

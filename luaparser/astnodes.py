@@ -812,12 +812,12 @@ class Return(Statement):
 
     def dump(self):
         if len(self.values) == 0:
-            return 'return NULL;'
+            return 'return T_NULL;'
 
         if len(self.values) == 1:
             return f'return {self.values[0].dump()};'
 
-        return f'return std::pair({", ".join(v.dump for v in self.values)});'
+        assert False, "Can't deal with returning multiple values"
 
 
 class Fornum(Statement):

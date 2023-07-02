@@ -299,7 +299,7 @@ class Lhs(Expression):
     """Define a Lua Left Hand Side expression."""
 
     def dump(self):
-        return super().dump()
+        raise NotImplementedError()
 
 
 class Name(Lhs):
@@ -322,7 +322,7 @@ class IndexNotation(Enum):
     SQUARE = 1  # obj[foo]
 
     def dump(self):
-        return super().dump()
+        raise NotImplementedError()
 
 
 class ArrayIndex(Lhs):
@@ -626,7 +626,7 @@ class While(Statement):
         self.body.parent = self
 
     def dump(self):
-        return super().dump()
+        raise NotImplementedError()
 
 
 class Do(Statement):
@@ -642,7 +642,7 @@ class Do(Statement):
         self.body.parent = self
 
     def dump(self):
-        return super().dump()
+        raise NotImplementedError()
 
 
 class Repeat(Statement):
@@ -661,7 +661,7 @@ class Repeat(Statement):
         self.test.parent = self
 
     def dump(self):
-        return super().dump()
+        raise NotImplementedError()
 
 
 class ElseIf(Statement):
@@ -685,7 +685,7 @@ class ElseIf(Statement):
             self.orelse.parent = self
 
     def dump(self):
-        return super().dump()
+        raise NotImplementedError()
 
     def add_declaration(self, n: Node, is_local: bool):
         self.body.body.insert(0, Declaration(n, Type.UNKNOWN, is_local))
@@ -756,7 +756,7 @@ class Label(Statement):
         self.id: Name = label_id
 
     def dump(self):
-        return super().dump()
+        raise NotImplementedError()
 
 
 class Goto(Statement):
@@ -771,7 +771,7 @@ class Goto(Statement):
         self.label: Name = label
 
     def dump(self):
-        return super().dump()
+        raise NotImplementedError()
 
 
 class SemiColon(Statement):
@@ -782,7 +782,7 @@ class SemiColon(Statement):
 
     def dump(self):
         return ""
-        return super().dump()
+        raise NotImplementedError()
 
 
 class Break(Statement):
@@ -793,7 +793,7 @@ class Break(Statement):
 
     def dump(self):
         return "break;"
-        return super().dump()
+        raise NotImplementedError()
 
 
 class Return(Statement):
@@ -1062,7 +1062,7 @@ class LocalFunction(Function):
         self.body: Block = body
 
     def dump(self):
-        return super().dump()
+        raise NotImplementedError()
 
 
 class Method(Statement):
@@ -1193,7 +1193,7 @@ class Varargs(Expression):
         super(Varargs, self).__init__("Varargs", **kwargs)
 
     def dump(self):
-        return super().dump()
+        raise NotImplementedError()
 
 
 class StringDelimiter(Enum):
@@ -1296,7 +1296,7 @@ class Dots(Expression):
         super().__init__("Dots", **kwargs)
 
     def dump(self):
-        return super().dump()
+        raise NotImplementedError()
 
 
 class AnonymousFunction(Expression):
@@ -1426,7 +1426,7 @@ class FloorDivOp(AriOp):
         super().__init__("FloorDivOp", left, right, **kwargs)
 
     def dump(self):
-        return super().dump()
+        raise NotImplementedError()
 
 
 class ModOp(AriOp):
@@ -1456,7 +1456,7 @@ class ExpoOp(AriOp):
         super().__init__("ExpoOp", left, right, **kwargs)
 
     def dump(self):
-        return super().dump()
+        raise NotImplementedError()
 
 
 """ ----------------------------------------------------------------------- """
@@ -1480,7 +1480,7 @@ class BAndOp(BitOp):
         super().__init__("BAndOp", left, right, **kwargs)
 
     def dump(self):
-        return super().dump()
+        raise NotImplementedError()
 
 
 class BOrOp(BitOp):
@@ -1495,7 +1495,7 @@ class BOrOp(BitOp):
         super().__init__("BOrOp", left, right, **kwargs)
 
     def dump(self):
-        return super().dump()
+        raise NotImplementedError()
 
 
 class BXorOp(BitOp):
@@ -1510,7 +1510,7 @@ class BXorOp(BitOp):
         super().__init__("BXorOp", left, right, **kwargs)
 
     def dump(self):
-        return super().dump()
+        raise NotImplementedError()
 
 
 class BShiftROp(BitOp):
@@ -1525,7 +1525,7 @@ class BShiftROp(BitOp):
         super().__init__("BShiftROp", left, right, **kwargs)
 
     def dump(self):
-        return super().dump()
+        raise NotImplementedError()
 
 
 class BShiftLOp(BitOp):
@@ -1540,7 +1540,7 @@ class BShiftLOp(BitOp):
         super().__init__("BShiftLOp", left, right, **kwargs)
 
     def dump(self):
-        return super().dump()
+        raise NotImplementedError()
 
 
 """ ----------------------------------------------------------------------- """

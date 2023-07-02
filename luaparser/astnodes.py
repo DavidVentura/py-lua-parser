@@ -912,15 +912,18 @@ class Call(Statement):
 
     def dump(self):
         # "builtins" are called directly, with an exact number of arguments.
-        _builtins = ['printh', 'flr', 'rnd', 'foreach', 'add', 'del',
+        _builtins = ['printh', 'printh_lambda', 'flr', 'rnd', 'foreach', 'add', 'del',
                      'getmetatable', 'setmetatable', 'count', '_sqr', '_sqrt',
                      'tostring',
                      '_draw', '_update', '_update60',
                      '_and', '_or',
-                     'cos', 'sin', 
+                     'cos', 'sin', 'abs', 'mget',
                      ]
+
+        # these allow for optionals and are namespaced under pico8
         _pico8_functions = ['cls', 'spr', 'map', 'btn', 'print', 'cos', 'pal', 'sin', 'palt',
                             'ovalfill', 'oval', 'circ', 'circfill', 'rect', 'rectfill', 'line',
+                            'sfx', 'abs', 'min', 'max', 'music', 'mget', 'fget', 'camera',
                             ]
         is_builtin = False
         is_pico8 = False

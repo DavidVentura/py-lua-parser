@@ -177,6 +177,7 @@ LITERAL_NAMES = [
     "'..'",
     "'.'",
     "';'",
+    "'?'",
     "NAME",
     "NUMBER",
     "STRING",
@@ -188,6 +189,7 @@ LITERAL_NAMES = [
     "LONG_BRACKET",
 ]
 
+assert len(LITERAL_NAMES) == len(list(Tokens))
 
 def _listify(obj):
     if not isinstance(obj, list):
@@ -502,7 +504,7 @@ class Builder:
                     break
 
         # optional ret stat
-        stat = self.parse_ret_stat()
+        stat = self.parse_ret_stat(until_newline)
         if stat:
             statements.append(stat)
         return Block(
@@ -548,11 +550,26 @@ class Builder:
 
         return None
 
-    def parse_ret_stat(self) -> Return or bool:
+    def parse_ret_stat(self, until_newline=False) -> Return or bool:
         self.save()
         if self.next_is_rc(Tokens.RETURN):
             t: Token = self._LT
-            expr_list = self.parse_expr_list()  # optional
+            # if this is coming from `parse_short_if_stat`, it ends at newline
+            # TODO: this is incomplete, it only supports bare returns like
+            # ```
+            # if (a) then return
+            # x = 1 -- this is not parsed as `return x; = 1` (syntax error)
+            # ```
+            found_nl = False
+            if until_newline:
+                tokens = self._stream.getHiddenTokensToRight(self._right_index)
+                for t in tokens:
+                    if t.type == Tokens.NEWLINE.value:
+                        found_nl = True
+
+            expr_list = []
+            if not found_nl:
+                expr_list = self.parse_expr_list()  # optional
             # consume optional token
             if self.next_is(Tokens.SEMCOL):
                 self.next_is_rc(Tokens.SEMCOL)

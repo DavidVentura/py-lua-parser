@@ -53,6 +53,7 @@ stat
   | goto_stat
   | if_stat
   | short_if_stat
+  | short_print_stat
   | for_stat
   | function
   | label
@@ -88,6 +89,10 @@ local
 
 goto_stat
   : GOTO NAME
+  ;
+
+short_print_stat
+  : QUESTION expr (COMMA expr)*
   ;
 
 short_if_stat
@@ -311,6 +316,7 @@ VARARGS   : '...';
 CONCAT    : '..';
 DOT       : '.';
 SEMCOL    : ';';
+QUESTION  : '?';
 
 NAME
   : (Letter | '_') (Letter | '_' | Digit)*

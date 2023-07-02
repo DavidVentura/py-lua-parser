@@ -104,6 +104,7 @@ class Tokens(enum.Enum):
     CONCAT = enum.auto()
     DOT = enum.auto()
     SEMCOL = enum.auto()
+    QUESTION = enum.auto()
     NAME = enum.auto()
     NUMBER = enum.auto()
     STRING = enum.auto()
@@ -526,6 +527,7 @@ class Builder:
             or self.parse_for_stat()
             or self.parse_function()
             or self.parse_label()
+            or self.parse_short_print()
         )
 
         if stat:
@@ -892,6 +894,15 @@ class Builder:
                     last_token=self._LT,
                 )
             )
+        return self.failure()
+
+    def parse_short_print(self) -> Call or bool:
+        self.save()
+        if self.next_is_rc(Tokens.QUESTION):
+            expr = self.parse_expr_list()
+            if expr:
+                self.success()
+                return Call(Name("print"), expr)
         return self.failure()
 
     def parse_short_if_stat(self) -> If or bool:

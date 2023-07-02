@@ -883,7 +883,25 @@ class Forin(Statement):
             t.parent = self
 
     def dump(self):
-        return super().dump()
+        # for x in all(tbl)
+        #   print(x)
+
+        assert len(self.iter) == 1
+        assert len(self.targets) == 1
+        _iter = self.iter[0]
+        target = self.targets[0]
+
+        return f'''
+        TValue_t* _super_secret_iterator = {_iter.dump()};
+        uint16_t __i = 0;
+        while(_super_secret_iterator[__i].tag != NUL) {{
+            TValue_t {target.dump()} = _super_secret_iterator[__i];
+            {self.body.dump()}
+            __i++;
+        }}
+
+        free(_super_secret_iterator);
+        '''
 
 
 class Call(Statement):
@@ -921,6 +939,7 @@ class Call(Statement):
                 'tostring',
                 '_and', '_or',
                 'cos', 'sin', 'abs', '_sqr', '_sqrt', 'flr',
+                'all',
          ]
         _exact_argument_pico8 = [
                 'time', 'dget', 'sget', 'shr', 'shl', 'atan2', 'cartdata',

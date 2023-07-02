@@ -912,19 +912,33 @@ class Call(Statement):
 
     def dump(self):
         # "builtins" are called directly, with an exact number of arguments.
-        _builtins = ['printh', 'printh_lambda', 'flr', 'rnd', 'foreach', 'add', 'del',
-                     'getmetatable', 'setmetatable', 'count', '_sqr', '_sqrt',
-                     'tostring',
-                     '_draw', '_update', '_update60',
-                     '_and', '_or',
-                     'cos', 'sin', 'abs', 'mget',
-                     ]
+        # things provided by lua or fix32 should be builtins
+        # things provided by pico8 with varargs are pico8fun
+        # -> pico8 + static # of args
+        _builtins = [
+                'printh', 'printh_lambda', 'foreach', 'add', 'del',
+                'getmetatable', 'setmetatable',
+                'tostring',
+                '_and', '_or',
+                'cos', 'sin', 'abs', '_sqr', '_sqrt', 'flr',
+         ]
+        _exact_argument_pico8 = [
+                'time', 'dget', 'sget', 'shr', 'shl', 'atan2', 'cartdata',
+                'mget', 'dset', '_draw', '_update', '_update60', 'count',
+        ]
+        _var_arg_pico8 = [
+                'cls', 'spr', 'map', 'btn', 'print', 'cos', 'pal', 'sin', 'palt',
+                'ovalfill', 'oval', 'circ', 'circfill', 'rect', 'rectfill', 'line',
+                'sfx', 'abs', 'min', 'max', 'music', 'fget', 'camera',
+                'btnp', 'rnd', 'sub', 'pset', 'poke',
+        ]
 
-        # these allow for optionals and are namespaced under pico8
-        _pico8_functions = ['cls', 'spr', 'map', 'btn', 'print', 'cos', 'pal', 'sin', 'palt',
-                            'ovalfill', 'oval', 'circ', 'circfill', 'rect', 'rectfill', 'line',
-                            'sfx', 'abs', 'min', 'max', 'music', 'mget', 'fget', 'camera',
-                            ]
+        _bad = set(_exact_argument_pico8).intersection(set(_var_arg_pico8))
+        assert not _bad, _bad
+
+        # these are namespaced under pico8
+        _pico8_functions = _var_arg_pico8 + _exact_argument_pico8
+
         is_builtin = False
         is_pico8 = False
         if self.func and isinstance(self.func, Name):

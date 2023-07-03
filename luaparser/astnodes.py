@@ -30,6 +30,7 @@ class Type(Enum):
     TABLE_PTR       = auto()
     UNKNOWN         = auto()
     UNK_PTR         = auto()
+    SLICE           = auto()
 
     def _repr(self):
         if self == Type.UNK_PTR:
@@ -38,6 +39,8 @@ class Type(Enum):
             return 'Table_t*'
         if self == Type.BARE_NUMBER:
             return 'uint8_t'
+        if self == Type.SLICE:
+            return 'TVSlice_t'
         return 'TValue_t'
 
 class Node:
@@ -235,8 +238,8 @@ class Block(Node):
 
     def replace_child(self, child, new_child):
         idx = self.body.index(child)
-        self.body[idx] = new_child
         new_child.parent = self
+        self.body[idx] = new_child
 
     def replace_child_multi(self, child, new_children: list):
         if len(new_children) == 0:
@@ -335,16 +338,14 @@ class ArrayIndex(Lhs):
         self,
         idx: Expression,
         value: Name,
-        array_len_var: Name,
         **kwargs
     ):
         super(ArrayIndex, self).__init__("ArrayIndex", **kwargs)
         self.idx = idx
         self.value: Expression = value
-        self.array_len_var = array_len_var
 
     def dump(self):
-        return f'__get_array_index_capped({self.value.dump()}, {self.array_len_var.dump()}, {self.idx.dump()})'
+        return f'__get_array_index_capped({self.value.dump()}, {self.idx.dump()})'
 
 class Index(Lhs):
     """Define a Lua index expression.
@@ -968,11 +969,12 @@ class Call(Statement):
 
         prefix = 'pico8.' if is_pico8 else ''
         if not is_builtin:
-            args = f'(TValue_t[{len(self.args)}]){{ {args} }}'
-            if len(self.args) == 0:
-                r = f'''CALL(({prefix}{self.func.dump()}), {len(self.args)}, NULL)'''
+            if self.args:
+                elems = f'(TValue_t[{len(self.args)}]){{ {args} }}'
             else:
-                r = f'''CALL(({prefix}{self.func.dump()}), {len(self.args)}, ({args}))'''
+                elems = 'NULL'
+            args = f'(TVSlice_t){{.elems={elems}, .num={len(self.args)} }}'
+            r = f'''CALL(({prefix}{self.func.dump()}), ({args}))'''
         else:
             # Not passing args as array
             r = f'''{prefix}{self.func.dump()}({args})'''

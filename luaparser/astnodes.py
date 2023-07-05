@@ -942,9 +942,10 @@ class Call(Statement):
                 '_and', '_or',
                 'cos', 'sin', 'abs', '_sqr', '_sqrt', 'flr',
                 'all',
+                '_ceil',
          ]
         _exact_argument_pico8 = [
-                'time', 'dget', 'sget', 'shr', 'shl', 'atan2', 'cartdata',
+                'time', 'dget', 'sget', 'pget', 'shr', 'shl', 'atan2', 'cartdata',
                 'mget', 'dset', '_draw', '_update', '_update60', 'count',
                 'fast_peek', 'fast_peek2', 'fast_peek4',
         ]
@@ -955,6 +956,7 @@ class Call(Statement):
                 'btnp', 'rnd', 'sub', 'pset',
                 'poke', 'poke2', 'poke4',
                 'peek', 'peek2', 'peek4',
+                'sgn', 'color',
         ]
 
         _bad = set(_exact_argument_pico8).intersection(set(_var_arg_pico8))

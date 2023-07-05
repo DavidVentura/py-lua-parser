@@ -892,15 +892,17 @@ class Forin(Statement):
         target = self.targets[0]
 
         return f'''
-        TValue_t* _super_secret_iterator = {_iter.dump()};
-        uint16_t __i = 0;
-        while(_super_secret_iterator[__i].tag != NUL) {{
-            TValue_t {target.dump()} = _super_secret_iterator[__i];
-            {self.body.dump()}
-            __i++;
-        }}
+        {{
+            TValue_t* _super_secret_iterator = {_iter.dump()};
+            uint16_t __i = 0;
+            while(_super_secret_iterator[__i].tag != NUL) {{
+                TValue_t {target.dump()} = _super_secret_iterator[__i];
+                {self.body.dump()}
+                __i++;
+            }}
 
-        free(_super_secret_iterator);
+            free(_super_secret_iterator);
+        }}
         '''
 
 

@@ -89,6 +89,8 @@ class Tokens(enum.Enum):
     BITAND = enum.auto()
     BITOR = enum.auto()
     BITNOT = enum.auto()
+    PEEK1 = enum.auto()
+    PEEK4 = enum.auto()
     BITRSHIFT = enum.auto()
     BITRLEFT = enum.auto()
     OPAR = enum.auto()
@@ -162,6 +164,8 @@ LITERAL_NAMES = [
     "'&'",
     "'|'",
     "'~'",
+    "peek1",
+    "peek4",
     "'>>'",
     "'<<'",
     "'('",
@@ -1460,6 +1464,16 @@ class Builder:
                 self.success()
                 return UBNotOp(expr, first_token=t, last_token=t)
 
+        peek_pairs = [(Tokens.PEEK1, "fast_peek"), (Tokens.MOD, "fast_peek2"), (Tokens.PEEK4, "fast_peek4")]
+        for tok, fn in peek_pairs:
+            self.failure_save()
+            if self.next_is_rc(tok):
+                t: Token = self._LT
+                expr = self.parse_unary_expr()
+                if expr:
+                    self.success()
+                    return Call(Name(fn), [expr])
+
         self.failure_save()
         expr = self.parse_pow_expr()
         if expr:
@@ -1506,6 +1520,7 @@ class Builder:
         if self.next_is(Tokens.NUMBER) and self.next_is_rc(Tokens.NUMBER):
             # TODO: optimize
             # using python number eval to parse lua number
+            nformat = NumberFormat.DEC
             if self.text in PICO8_SPECIAL_NUMBERS:
                 number = PICO8_SPECIAL_NUMBERS[self.text]
                 ntype = NumberType.INT
@@ -1522,11 +1537,16 @@ class Builder:
                 else:
                     try:
                         number = ast.literal_eval(self.text)
+                        if '0b' in self.text:
+                            nformat = NumberFormat.BIN
+                        elif '0x' in self.text:
+                            nformat = NumberFormat.HEX
+
                         if isinstance(number, int):
                             ntype = NumberType.INT
                         else:
                             ntype = NumberType.FLT
-                    except:
+                    except SyntaxError:
                         # exception occurs with leading zero number: 002
                         number = float(self.text)
                         if number.is_integer():
@@ -1536,6 +1556,7 @@ class Builder:
             return Number(
                 number,
                 ntype,
+                nformat,
                 first_token=self._LT,
                 last_token=self._LT,
             )

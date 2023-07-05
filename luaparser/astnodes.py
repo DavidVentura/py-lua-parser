@@ -940,12 +940,15 @@ class Call(Statement):
         _exact_argument_pico8 = [
                 'time', 'dget', 'sget', 'shr', 'shl', 'atan2', 'cartdata',
                 'mget', 'dset', '_draw', '_update', '_update60', 'count',
+                'fast_peek', 'fast_peek2', 'fast_peek4',
         ]
         _var_arg_pico8 = [
                 'cls', 'spr', 'map', 'btn', 'print', 'cos', 'pal', 'sin', 'palt',
                 'ovalfill', 'oval', 'circ', 'circfill', 'rect', 'rectfill', 'line',
                 'sfx', 'abs', 'min', 'max', 'music', 'fget', 'camera',
-                'btnp', 'rnd', 'sub', 'pset', 'poke',
+                'btnp', 'rnd', 'sub', 'pset',
+                'poke', 'poke2', 'poke4',
+                'peek', 'peek2', 'peek4',
         ]
 
         _bad = set(_exact_argument_pico8).intersection(set(_var_arg_pico8))
@@ -1147,6 +1150,11 @@ class FalseExpr(Expression):
         return 'T_FALSE'
 
 
+class NumberFormat(Enum):
+    DEC = auto()
+    BIN = auto()
+    HEX = auto()
+
 class NumberType(Enum):
     INT = auto()
     FLT = auto()
@@ -1162,10 +1170,11 @@ class Number(Expression):
     """
     type = Type.NUMBER
 
-    def __init__(self, n: str, ntype: NumberType, **kwargs):
+    def __init__(self, n: str, ntype: NumberType, nformat: NumberFormat=NumberFormat.DEC, **kwargs):
         super(Number, self).__init__("Number", **kwargs)
         self.n: str = n
         self.ntype: NumberType = ntype
+        self.nformat = nformat
 
     def dump(self):
         # 0x77.aa -> fix32(0x77, 0xAA)
@@ -1179,6 +1188,9 @@ class Number(Expression):
         if self.ntype is NumberType.BARE_INT:
             return self.n
 
+        assert self.ntype is NumberType.INT
+        if self.nformat is NumberFormat.HEX:
+            return f'TNUM16({hex(int(self.n))})'
         # 1 -> fix32(1)
         return f'TNUM16({self.n})'
 

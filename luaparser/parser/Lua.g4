@@ -180,6 +180,9 @@ unary_expr
   | LENGTH pow_expr
   | NOT unary_expr
   | BITNOT unary_expr
+  | PEEK1 unary_expr
+  | MOD unary_expr
+  | PEEK4 unary_expr
   | pow_expr
   ;
 
@@ -286,7 +289,7 @@ ADD       : '+';
 MINUS     : '-';
 MULT      : '*';
 DIV       : '/';
-FLOOR     : '//';
+FLOOR     : '\\';
 MOD       : '%';
 POW       : '^';
 LENGTH    : '#';
@@ -301,6 +304,9 @@ ASSIGN    : '=';
 BITAND    : '&';
 BITOR     : '|';
 BITNOT    : '~';
+PEEK1     : '@';
+// PEEK2  is MOD
+PEEK4     : '$';
 BITRSHIFT : '>>';
 BITRLEFT  : '<<';
 OPAR      : '(';

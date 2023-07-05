@@ -1436,7 +1436,7 @@ class FloorDivOp(AriOp):
         super().__init__("FloorDivOp", left, right, **kwargs)
 
     def dump(self):
-        raise NotImplementedError()
+        return f'_floor_div({self.left.dump()}, {self.right.dump()})'
 
 
 class ModOp(AriOp):

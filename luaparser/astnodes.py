@@ -1192,6 +1192,8 @@ class Number(Expression):
         assert self.ntype is NumberType.INT
         if self.nformat is NumberFormat.HEX:
             return f'TNUM16({hex(int(self.n))})'
+        elif self.nformat is NumberFormat.BIN:
+            return f'TNUM16({bin(int(self.n))})'
         # 1 -> fix32(1)
         return f'TNUM16({self.n})'
 

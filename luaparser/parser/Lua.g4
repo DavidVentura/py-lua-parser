@@ -331,6 +331,7 @@ NAME
 NUMBER
   : (Digit+ ('.' Digit*)? Exponent? | '.' Digit+ Exponent?)
   | '0' ('x' | 'X') HexDigits ('.' HexDigits?)? BinaryExponent?
+  | '0' ('b' | 'B') BinDigits ('.' BinDigits?)? BinaryExponent?
   ;
 
 STRING
@@ -383,8 +384,16 @@ fragment HexDigit
   | 'A'..'F'
   ;
 
+fragment BinDigit
+  : '0'..'1'
+  ;
+
 fragment HexDigits
   : HexDigit+
+  ;
+
+fragment BinDigits
+  : BinDigit+
   ;
 
 fragment Exponent

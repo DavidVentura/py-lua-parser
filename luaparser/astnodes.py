@@ -855,7 +855,7 @@ class Fornum(Statement):
 
     def dump(self):
         return f'''for(TValue_t {self.target.dump()} = {self.start.dump()}; __bool(_leq({self.target.dump()}, {self.stop.dump()})); {self.target.dump()} = _add({self.target.dump()}, {self.step.dump()})) {{
-            {NEWLINE.join(s.dump() for s in self.body.body)}
+            {self.body.dump()}
         }}'''
 
 

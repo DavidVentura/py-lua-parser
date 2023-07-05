@@ -622,7 +622,11 @@ class While(Statement):
         self.body.parent = self
 
     def dump(self):
-        raise NotImplementedError()
+        return f'''
+        while (_bool({self.test.dump()})) {{
+            {self.body.dump()}
+        }}
+        '''
 
 
 class Do(Statement):

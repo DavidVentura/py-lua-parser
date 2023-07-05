@@ -1476,7 +1476,7 @@ class ExpoOp(AriOp):
         super().__init__("ExpoOp", left, right, **kwargs)
 
     def dump(self):
-        raise NotImplementedError()
+        return f'_pow({self.left.dump()}, {self.right.dump()})'
 
 
 """ ----------------------------------------------------------------------- """
@@ -1500,7 +1500,7 @@ class BAndOp(BitOp):
         super().__init__("BAndOp", left, right, **kwargs)
 
     def dump(self):
-        raise NotImplementedError()
+        return f'_binary_and({self.left.dump()}, {self.right.dump()})'
 
 
 class BOrOp(BitOp):
@@ -1515,7 +1515,7 @@ class BOrOp(BitOp):
         super().__init__("BOrOp", left, right, **kwargs)
 
     def dump(self):
-        raise NotImplementedError()
+        return f'_binary_or({self.left.dump()}, {self.right.dump()})'
 
 
 class BXorOp(BitOp):
@@ -1530,7 +1530,7 @@ class BXorOp(BitOp):
         super().__init__("BXorOp", left, right, **kwargs)
 
     def dump(self):
-        raise NotImplementedError()
+        return f'_binary_xor({self.left.dump()}, {self.right.dump()})'
 
 
 class BShiftROp(BitOp):

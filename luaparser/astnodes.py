@@ -957,20 +957,21 @@ class Call(Statement):
         # these are namespaced under pico8
         _pico8_functions = _var_arg_pico8 + _exact_argument_pico8
 
-        is_builtin = False
+        exact_args = False
         is_pico8 = False
         if self.func and isinstance(self.func, Name):
-            is_builtin = self.func.id in _builtins or self.func.id.startswith("__internal_debug_")
+            exact_args = self.func.id in _builtins+_exact_argument_pico8 or self.func.id.startswith("__internal_debug_")
             is_pico8 = self.func.id in _pico8_functions
 
         args = f'{", ".join(a.dump() for a in self.args)}'
-
         prefix = 'pico8.' if is_pico8 else ''
-        if not is_builtin:
+
+        if not exact_args:
             if self.args:
                 elems = f'(TValue_t[{len(self.args)}]){{ {args} }}'
             else:
                 elems = 'NULL'
+
             args = f'(TVSlice_t){{.elems={elems}, .num={len(self.args)} }}'
             r = f'''CALL(({prefix}{self.func.dump()}), ({args}))'''
         else:

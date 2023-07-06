@@ -396,8 +396,11 @@ class Index(Lhs):
             assert False, "This should've been replaced with SetTabValue"
 
         if self.notation == IndexNotation.DOT:
-            # DOT notation (a.b) is always a string (a["b"])
-            return f'get_tabvalue({self.value.dump()}, TSTR("{self.idx.dump()}"))'
+            # DOT notation (a.b) is always a string (a["b"]), which gets later optimized to a StringRef
+            if isinstance(self.idx, String):
+                return f'get_tabvalue({self.value.dump()}, TSTR("{self.idx.dump()}"))'
+            assert isinstance(self.idx, StringRef)
+            return f'get_tabvalue({self.value.dump()}, {self.idx.dump()})'
 
         # bracket notation could be a string (a["b"])
         if isinstance(self.idx, String):
@@ -409,6 +412,13 @@ class Index(Lhs):
     @property
     def type(self):
         return self.value.type
+
+    def replace_child(self, child, new_child):
+        new_child.parent = self
+        if self.idx == child:
+            self.idx = new_child
+        if self.value == child:
+            self.value = new_child
 
 """ ----------------------------------------------------------------------- """
 """ Statements                                                              """
@@ -943,6 +953,7 @@ class Call(Statement):
                 'cos', 'sin', 'abs', '_sqr', '_sqrt', 'flr',
                 'all',
                 '_ceil',
+                '_grow_strings_to',
          ]
         _exact_argument_pico8 = [
                 'time', 'dget', 'sget', 'pget', 'shr', 'shl', 'atan2', 'cartdata',
@@ -1229,6 +1240,36 @@ class FunctionReference(Expression):
         self.name = name
     def dump(self):
         return f"TFUN({self.name.dump()})"
+
+
+class StringDecl(Expression):
+    type = Type.STRING
+    def __init__(self, name: str, index: int, **kwargs):
+        super(StringDecl, self).__init__("StringDecl", **kwargs)
+        self.name = name
+        self.index = index
+
+    def dump(self):
+        return f'TSTRi(_store_str_at_or_die(CONSTSTR("{self.name}"), {self.index}))'
+
+
+class StringRef(Expression):
+    type = Type.STRING
+    def __init__(self, name: str, **kwargs):
+        super(StringRef, self).__init__("StringRef", **kwargs)
+        self.name = name
+
+    @property
+    def varname(self):
+        name = self.name.replace(" ", "_").replace("-", "_dash_")
+        name = name.replace("#", "_hash_").replace("$", "_dollar_")
+        name = name.replace(",", "_")
+        name = name[:32]
+        varname = f'__str_{name}'
+        return varname
+
+    def dump(self):
+        return self.varname
 
 class String(Expression):
     """Define the Lua string expression.

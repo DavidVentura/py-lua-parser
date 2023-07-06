@@ -328,6 +328,14 @@ class WalkVisitor:
     def visit(self, node):
         self._nodes.append(node)
 
+    @visitor(StringDecl)
+    def visit(self, node):
+        self._nodes.append(node)
+
+    @visitor(StringRef)
+    def visit(self, node):
+        self._nodes.append(node)
+
     @visitor(String)
     def visit(self, node):
         self._nodes.append(node)

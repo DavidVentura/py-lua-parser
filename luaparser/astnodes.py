@@ -4,6 +4,7 @@
 
     Contains all Ast Node definitions.
 """
+import string
 import textwrap
 from enum import Enum, auto
 from typing import List, Optional
@@ -1345,6 +1346,9 @@ class StringRef(Expression):
         name = self.name.replace(" ", "_").replace("-", "_dash_")
         name = name.replace("#", "_hash_").replace("$", "_dollar_")
         name = name.replace(",", "_")
+        for bad in string.punctuation + string.whitespace:
+            name = name.replace(bad, "_")
+        name = name.replace("❎", "_X_")
         name = name[:32]
         varname = f'__str_{name}'
         return varname

@@ -343,6 +343,12 @@ class ArrayIndex(Lhs):
         super(ArrayIndex, self).__init__("ArrayIndex", **kwargs)
         self.idx = idx
         self.value: Expression = value
+        self.set_parent_on_children()
+
+    def set_parent_on_children(self):
+        self.idx.parent = self
+        self.value.parent = self
+
 
     def dump(self):
         return f'__get_array_index_capped({self.value.dump()}, {self.idx.dump()})'
@@ -434,10 +440,24 @@ class SetTabValue(Statement):
         self.table = table
         self.key = key
         self.value = value
+        self.set_parent_on_children()
 
     def dump(self):
         return f'set_tabvalue({self.table.dump()}, {self.key.dump()}, {self.value.dump()});'
 
+    def set_parent_on_children(self):
+        self.key.parent = self
+        self.table.parent = self
+        self.value.parent = self
+
+    def replace_child(self, child, new_child):
+        new_child.parent = self
+        if self.key == child:
+            self.key = new_child
+        elif self.table == child:
+            self.table = new_child
+        elif self.value == child:
+            self.value = new_child
 
 class IAddTab(Statement):
     """
@@ -448,6 +468,18 @@ class IAddTab(Statement):
         self.table = table
         self.key = key
         self.value = value
+        self.set_parent_on_children()
+
+    def replace_child(self, child, new_child):
+        new_child.parent = self
+        if child == self.key:
+            self.key = new_child
+        if child == self.value:
+            self.value = new_child
+
+    def set_parent_on_children(self):
+        self.key.parent = self
+        self.value.parent = self
 
     def dump(self):
         return f'iadd_tab({self.table.dump()}, {self.key.dump()}, {self.value.dump()});'
@@ -462,6 +494,18 @@ class ISubTab(Statement):
         self.table = table
         self.key = key
         self.value = value
+        self.set_parent_on_children()
+
+    def replace_child(self, child, new_child):
+        new_child.parent = self
+        if child == self.key:
+            self.key = new_child
+        if child == self.value:
+            self.value = new_child
+
+    def set_parent_on_children(self):
+        self.key.parent = self
+        self.value.parent = self
 
     def dump(self):
         return f'isub_tab({self.table.dump()}, {self.key.dump()}, {self.value.dump()});'
@@ -476,6 +520,18 @@ class IMulTab(Statement):
         self.table = table
         self.key = key
         self.value = value
+        self.set_parent_on_children()
+
+    def replace_child(self, child, new_child):
+        new_child.parent = self
+        if child == self.key:
+            self.key = new_child
+        if child == self.value:
+            self.value = new_child
+
+    def set_parent_on_children(self):
+        self.key.parent = self
+        self.value.parent = self
 
     def dump(self):
         return f'imul_tab({self.table.dump()}, {self.key.dump()}, {self.value.dump()});'
@@ -490,6 +546,18 @@ class IDivTab(Statement):
         self.table = table
         self.key = key
         self.value = value
+        self.set_parent_on_children()
+
+    def replace_child(self, child, new_child):
+        new_child.parent = self
+        if child == self.key:
+            self.key = new_child
+        if child == self.value:
+            self.value = new_child
+
+    def set_parent_on_children(self):
+        self.key.parent = self
+        self.value.parent = self
 
     def dump(self):
         return f'idiv_tab({self.table.dump()}, {self.key.dump()}, {self.value.dump()});'
@@ -815,10 +883,15 @@ class Return(Statement):
 
     def __init__(self, values, **kwargs):
         super(Return, self).__init__("Return", **kwargs)
-        self.values = values
         for v in values:
             v.parent = self
+        self.values = values
         self.type = Type.NULL
+
+    def replace_child(self, child, new_child):
+        new_child.parent = self
+        idx = self.values.index(child)
+        self.values[idx] = new_child
 
     def dump(self):
         if len(self.values) == 0:
@@ -924,21 +997,25 @@ class Call(Statement):
         args (`list<Expression>`): Function call arguments.
     """
 
-    def replace_child(self, child, new_child):
-        idx = self.args.index(child)
-        self.args[idx] = new_child
-        new_child.parent = self
-
     def __init__(self, func: Expression, args: List[Expression], **kwargs):
         super(Call, self).__init__("Call", **kwargs)
         self.func: Expression = func
         self.args: List[Expression] = args
         self.type = Type.UNKNOWN
+        self.set_parent_on_children()
 
-        if func:
+    def set_parent_on_children(self):
+        if self.func:  # created in two parts
             self.func.parent = self
         for a in self.args:
             a.parent = self
+
+    def replace_child(self, child, new_child):
+        if new_child == self.func:
+            assert False
+        idx = self.args.index(child)
+        new_child.parent = self
+        self.args[idx] = new_child
 
     def dump(self):
         # "builtins" are called directly, with an exact number of arguments.
@@ -1751,6 +1828,13 @@ class Concat(BinaryOp):
 
     def dump(self):
         return f'_concat({self.left.dump()}, {self.right.dump()})'
+
+    def replace_child(self, child, new_child):
+        new_child.parent = self
+        if self.left == child:
+            self.left = new_child
+        if self.right == child:
+            self.right = new_child
 
 
 """ ----------------------------------------------------------------------- """

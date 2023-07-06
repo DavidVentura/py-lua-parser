@@ -898,7 +898,11 @@ class Return(Statement):
             return 'return T_NULL;'
 
         if len(self.values) == 1:
-            return f'return {self.values[0].dump()};'
+            ret = ''
+            if isinstance(self.values[0], Name):
+                ret += f'_incref({self.values[0].dump()});'
+            ret += f'return {self.values[0].dump()};'
+            return ret
 
         assert False, "Can't deal with returning multiple values"
 

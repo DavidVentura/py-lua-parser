@@ -1371,6 +1371,11 @@ class StringRef(Expression):
         for bad in string.punctuation + string.whitespace:
             name = name.replace(bad, "_")
         name = name.replace("❎", "_X_")
+        name = name.replace("⬅️", "_left_")
+        name = name.replace("➡️", "_right_")
+        name = name.replace("⬆️", "_up_")
+        name = name.replace("⬇️", "_down_")
+        name = name.replace("♪", "_music_")
         name = name[:32]
         varname = f'__str_{name}'
         return varname

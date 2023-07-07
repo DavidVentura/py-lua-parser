@@ -332,7 +332,7 @@ SEMCOL    : ';';
 QUESTION  : '?';
 
 NAME
-  : (Letter | '_') (Letter | '_' | Digit)*
+  : (Letter | (UnicodeSymbol Letter) | '_') (Letter | '_' | Digit | UnicodeSymbol)*
   ;
 
 NUMBER
@@ -378,6 +378,10 @@ SHEBANG
 fragment Letter
   : 'a'..'z'
   | 'A'..'Z'
+  ;
+
+fragment UnicodeSymbol
+  : '\u0080'..'\uFFFF'
   ;
 
 fragment Digit

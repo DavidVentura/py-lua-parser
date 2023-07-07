@@ -9,7 +9,6 @@ from luaparser.parser.LuaLexer import LuaLexer
 from typing import List, Tuple
 from antlr4.Token import Token
 
-HEX_DECIMAL = re.compile(r'(?P<INT>0x[0-9a-f]+)\.(?P<DEC>[0-9a-f]+)')
 PICO8_SPECIAL_NUMBERS = {
     '⬅️': 0,
     '➡️': 1,
@@ -1553,34 +1552,45 @@ class Builder:
                 number = PICO8_SPECIAL_NUMBERS[self.text]
                 ntype = NumberType.INT
             else:
-                m = HEX_DECIMAL.match(self.text)
-                if m:
-                    integer_part = m.group('INT')
-                    decimal_part = m.group('DEC')
-                    #integer_part = int(integer_part, 16)
-                    #decimal_part = int(decimal_part, 16)
-                    number = f'{integer_part}.{decimal_part:0<4}'
-                    ntype = NumberType.FIX
-                    # number = (integer_part << 16) | decimal_part
-                else:
-                    try:
-                        number = ast.literal_eval(self.text)
-                        if '0b' in self.text:
-                            nformat = NumberFormat.BIN
-                        elif '0x' in self.text:
-                            nformat = NumberFormat.HEX
+                _int_part, _, _dec_part = self.text.partition('.')
 
-                        if isinstance(number, int):
-                            ntype = NumberType.INT
-                        else:
-                            ntype = NumberType.FLT
-                    except SyntaxError:
-                        # exception occurs with leading zero number: 002
-                        number = float(self.text)
-                        if number.is_integer():
-                            ntype = NumberType.FLT
-                        else:
-                            ntype = NumberType.INT
+                dec_part = 0
+                if '0b' in _int_part:
+                    nformat = NumberFormat.BIN
+                    int_part = int(_int_part[2:], 2)
+                    if _dec_part:
+                        # a given decimal binary literal may look like
+                        # 0b1010.1010
+                        # the integer part is straight forward.
+                        # the decimal part is "the highest bits", so it must be shifted left
+                        # to represent the entire number; in this case we shift left by 12 to get
+                        # 0b1010.1010000000000000
+                        dec_part = int(_dec_part, 2) << (16 - len(_dec_part))
+                        dec_part = hex(dec_part)[2:] # trim leading 0x
+                    ntype = NumberType.FIX if dec_part else NumberType.INT
+                elif '0x' in _int_part:
+                    nformat = NumberFormat.HEX
+                    int_part = int(_int_part[2:], 16)
+                    if _dec_part:
+                        # a given decimal hex literal may look like
+                        # 0xaaaa.bb
+                        # the integer part is straight forward.
+                        # the decimal part is "the highest bits", so it must be shifted left
+                        # to represent the entire number; in this case we shift left by 8 to get
+                        # 0xaaaa.bb00
+                        dec_part = int(_dec_part, 16) << (16 - (len(_dec_part)*4))  # *4 as each hex-digit (0x0-0xF) is 4 bits
+                        dec_part = hex(dec_part)[2:] # trim leading 0x
+                    ntype = NumberType.FIX if dec_part else NumberType.INT
+                else:
+                    int_part = int(_int_part, 10)
+                    dec_part = int(_dec_part, 10) if _dec_part else 0
+                    ntype = NumberType.FLT if dec_part else NumberType.INT
+
+                if _dec_part:
+                    number = f'{int_part}.{dec_part}'
+                else:
+                    number =  f'{int_part}'
+
             return Number(
                 number,
                 ntype,

@@ -319,6 +319,9 @@ class Name(Lhs):
         self.id: str = identifier
         self.type = type
 
+    def children(self):
+        return []
+
     def dump(self):
         return self.id
 
@@ -1012,6 +1015,9 @@ class Call(Statement):
         self.type = Type.UNKNOWN
         self.set_parent_on_children()
 
+    def children(self):
+        return [self.func] + self.args
+
     def set_parent_on_children(self):
         if self.func:  # created in two parts
             self.func.parent = self
@@ -1019,10 +1025,11 @@ class Call(Statement):
             a.parent = self
 
     def replace_child(self, child, new_child):
-        if new_child == self.func:
-            assert False
-        idx = self.args.index(child)
         new_child.parent = self
+        if child == self.func:
+            self.func = new_child
+            return
+        idx = self.args.index(child)
         self.args[idx] = new_child
 
     def dump(self):
@@ -1231,6 +1238,9 @@ class Nil(Expression):
     def __init__(self, **kwargs):
         super(Nil, self).__init__("Nil", **kwargs)
 
+    def children(self):
+        return []
+
     def dump(self):
         return "T_NULL" # null tvalue
 
@@ -1241,6 +1251,9 @@ class TrueExpr(Expression):
     def __init__(self, **kwargs):
         super(TrueExpr, self).__init__("True", **kwargs)
 
+    def children(self):
+        return []
+
     def dump(self):
         return 'T_TRUE'
 
@@ -1250,6 +1263,9 @@ class FalseExpr(Expression):
 
     def __init__(self, **kwargs):
         super(FalseExpr, self).__init__("False", **kwargs)
+
+    def children(self):
+        return []
 
     def dump(self):
         return 'T_FALSE'
@@ -1280,6 +1296,9 @@ class Number(Expression):
         self.n: str = n
         self.ntype: NumberType = ntype
         self.nformat = nformat
+
+    def children(self):
+        return []
 
     def dump(self):
         # 0x77.aa -> fix32(0x77, 0xAA)
@@ -1377,6 +1396,9 @@ class String(Expression):
         super(String, self).__init__("String", **kwargs)
         self.s: str = s
         self.delimiter: StringDelimiter = delimiter
+
+    def children(self):
+        return []
 
     def dump(self):
         _s = self.s.replace(r'\^', chr(6))
@@ -1496,6 +1518,16 @@ class BinaryOp(Op):
         raise ValueError(f'BinaryOp not defined for {self.__class__}')
 
 
+    def children(self):
+        return [self.left, self.right]
+
+    def replace_child(self, child, new_child):
+        new_child.parent = self
+        if child == self.left:
+            self.left = new_child
+        if child == self.right:
+            self.right = new_child
+
 """ ----------------------------------------------------------------------- """
 """ 3.4.1 – Arithmetic Operators                                            """
 """ ----------------------------------------------------------------------- """
@@ -1504,7 +1536,6 @@ class BinaryOp(Op):
 class AriOp(BinaryOp):
     """Base class for Arithmetic Operators"""
     type = Type.NUMBER
-
 
 class AddOp(AriOp):
     """Add expression.
@@ -1706,6 +1737,14 @@ class RelOp(BinaryOp):
     def dump(self):
         return f'{self.OP}({self.left.dump()}, {self.right.dump()})'
 
+    def replace_child(self, child, new_child):
+        new_child.parent = self
+        if child == self.left:
+            self.left = new_child
+        if child == self.right:
+            self.right = new_child
+
+
 
 class LessThanOp(RelOp):
     """Less than expression.
@@ -1770,7 +1809,6 @@ class EqToOp(RelOp):
 
     def __init__(self, left: Expression, right: Expression, **kwargs):
         super().__init__("REqOp", left, right, **kwargs)
-
 
 class NotEqToOp(RelOp):
     """Not equal to expression.
@@ -1867,6 +1905,9 @@ class UnaryOp(Expression):
         super().__init__(name, **kwargs)
         self.operand = operand
         self.operand.parent = self
+
+    def children(self):
+        return [self.operand]
 
 
 class UMinusOp(UnaryOp):

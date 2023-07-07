@@ -48,6 +48,7 @@ stat
   | var[False]
   | do_block
   | while_stat
+  | short_while_stat
   | repeat_stat
   | local
   | goto_stat
@@ -67,6 +68,11 @@ do_block
 
 while_stat
   : WHILE expr do_block
+  ;
+
+
+short_while_stat
+  : WHILE OPAR expr CPAR expr
   ;
 
 repeat_stat

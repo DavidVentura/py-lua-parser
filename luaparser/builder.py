@@ -524,6 +524,7 @@ class Builder:
             self.parse_assignment()
             or self.parse_inplace_op()
             or self.parse_var()
+            or self.parse_short_while_stat() # short_while does not `abort()` on failure, it has to be tried before regular while
             or self.parse_while_stat()
             or self.parse_repeat_stat()
             or self.parse_local()
@@ -837,6 +838,29 @@ class Builder:
                     self.success()
                     return While(expr, body)
             self.abort()
+
+        return self.failure()
+
+    def parse_short_while_stat(self) -> While or bool:
+        self.save()
+
+        if self.next_is_rc(Tokens.WHILE):
+            token = self._stream.LT(1)
+            if token.type != Tokens.OPAR.value:
+                return self.failure()
+
+            self._expected = []
+            expr = self.parse_expr()
+            if self.next_is_rc(Tokens.THEN):  # short while is `while (cond) stat`; no `then`
+                return self.failure()
+
+            if expr:
+                token = self._stream.LT(1)
+                body = self.parse_block(until_newline=True)
+                if body:
+                    main = While(expr, body)
+                    self.success()
+                    return main
 
         return self.failure()
 

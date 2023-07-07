@@ -390,6 +390,9 @@ class Index(Lhs):
         self.value.parent = self
         self.idx.parent = self
 
+    def children(self):
+        return [self.idx, self.value]
+
     def dump_write(self, op: str, value: str):
         # a.t->set(FIELD___INDEX, a); // ?
         if isinstance(self.idx, String):
@@ -587,11 +590,7 @@ class Assign(Statement):
         self.type = Type.UNKNOWN
         self.local: bool = False
 
-        for t in self.targets:
-            t.parent = self
-        for v in self.values:
-            v.parent = self
-
+        self.set_parent_on_children()
         if len(self.values) == 0:
             # local a
             return
@@ -646,6 +645,12 @@ class Assign(Statement):
             r.append(f'_set(&{t.dump()}, {v.dump()});')
         return '\n'.join(r)
 
+    def set_parent_on_children(self):
+        for t in self.targets:
+            t.parent = self
+        for v in self.values:
+            v.parent = self
+
 class IAssign(Statement):
     def __init__(self, target: Node, value: Node, op: Expression, **kwargs):
         super().__init__("IAssign", **kwargs)
@@ -688,6 +693,7 @@ class LocalAssign(Assign):
         super().__init__(targets, values, **kwargs)
         self._name: str = "LocalAssign"
         self.local: bool = True
+        self.set_parent_on_children()
 
 
 class While(Statement):
@@ -762,11 +768,20 @@ class ElseIf(Statement):
         self.test: Node = test
         self.body: Block = body
         self.orelse = orelse
+        self.set_parent_on_children()
 
+    def set_parent_on_children(self):
         self.test.parent = self
         self.body.parent = self
-        if orelse:
+        if self.orelse:
             self.orelse.parent = self
+
+    def replace_child(self, child, new_child):
+        new_child.parent = self
+        if child == self.test:
+            self.test = new_child
+            return
+        assert False
 
     def dump(self):
         raise NotImplementedError()
@@ -792,9 +807,12 @@ class If(Statement):
         self.body: Block = body
         self.orelse = orelse
 
+        self.set_parent_on_children()
+
+    def set_parent_on_children(self):
         self.test.parent = self
         self.body.parent = self
-        if orelse:
+        if self.orelse:
             self.orelse.parent = self
 
     def dump(self):
@@ -826,6 +844,8 @@ class If(Statement):
         new_child.parent = self
         if self.test == child:
             self.test = new_child 
+            return
+        assert False
 
 
 class Label(Statement):

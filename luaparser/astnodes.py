@@ -944,7 +944,8 @@ class Fornum(Statement):
         self.body.parent = self
 
     def dump(self):
-        return f'''for(TValue_t {self.target.dump()} = {self.start.dump()}; __bool(_leq({self.target.dump()}, {self.stop.dump()})); {self.target.dump()} = _add({self.target.dump()}, {self.step.dump()})) {{
+        return f'''
+        for(TValue_t {self.target.dump()} = {self.start.dump()}; __bool(_leq({self.target.dump()}, {self.stop.dump()})); {self.target.dump()} = _add({self.target.dump()}, {self.step.dump()})) {{
             {self.body.dump()}
         }}'''
 
@@ -1041,7 +1042,7 @@ class Call(Statement):
          ]
         _exact_argument_pico8 = [
                 'time', 'dget', 'sget', 'pget', 'shr', 'shl', 'atan2', 'cartdata',
-                'mget', 'dset', '_draw', '_update', '_update60', 'count',
+                'mget', 'dset', '_draw', '_update', '_update60',
                 'fast_peek', 'fast_peek2', 'fast_peek4',
         ]
         _var_arg_pico8 = [
@@ -1051,7 +1052,7 @@ class Call(Statement):
                 'btnp', 'rnd', 'sub', 'pset',
                 'poke', 'poke2', 'poke4',
                 'peek', 'peek2', 'peek4',
-                'sgn', 'color',
+                'sgn', 'color', 'count',
         ]
 
         _bad = set(_exact_argument_pico8).intersection(set(_var_arg_pico8))
@@ -1081,7 +1082,7 @@ class Call(Statement):
             # Not passing args as array
             r = f'''{prefix}{self.func.dump()}({args})'''
 
-        if isinstance(self.parent, Block):
+        if isinstance(self.parent, (Block, Function)):
             r += ';'
 
         return r
@@ -1403,9 +1404,11 @@ class Field(Expression):
         self.between_brackets: bool = between_brackets
 
     def dump(self):
-        if isinstance(self.key, (String, Number)):
+        if isinstance(self.key, (Name, String, Number)):
             kd = self.key.dump()
         else:
+            print(self.key)
+            assert False, self.key.dump()
             kd = f'TSTR("{self.key.dump()}")'
         return f'{kd}, {self.value.dump()}'
 
@@ -1425,6 +1428,7 @@ class Table(Expression):
             f.value.parent = self
 
         self.field_names = list({f.key.dump() for f in self.fields})
+        self.set_parent_on_children()
 
 
     def dump(self):

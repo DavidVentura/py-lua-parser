@@ -1582,7 +1582,8 @@ class Builder:
                         dec_part = hex(dec_part)[2:] # trim leading 0x
                     ntype = NumberType.FIX if dec_part else NumberType.INT
                 else:
-                    int_part = int(_int_part, 10)
+                    # it is legal to assign `a = .5`
+                    int_part = int(_int_part, 10) if _int_part else 0
                     dec_part = int(_dec_part, 10) if _dec_part else 0
                     ntype = NumberType.FLT if dec_part else NumberType.INT
 

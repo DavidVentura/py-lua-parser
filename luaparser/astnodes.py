@@ -1010,13 +1010,35 @@ class Forin(Statement):
         for t in self.targets:
             t.parent = self
 
+    def dump_pairs(self):
+        var_a = self.targets[0]
+        var_b = self.targets[1]
+        _iter = self.iter[0]
+        return f'''
+        {{
+            KV_t* _pairs_iterator = {_iter.dump()};
+            uint16_t __i = 0;
+            while(_pairs_iterator[__i].key.tag != NUL) {{
+                TValue_t {var_a.dump()} = _pairs_iterator[__i].key;
+                TValue_t {var_b.dump()} = _pairs_iterator[__i].value;
+                {self.body.dump()}
+                __i++;
+            }}
+
+            free(_pairs_iterator);
+        }}
+        '''
     def dump(self):
         # for x in all(tbl)
         #   print(x)
 
         assert len(self.iter) == 1
-        assert len(self.targets) == 1
         _iter = self.iter[0]
+        if len(self.targets) > 0 and isinstance(_iter, Call) and _iter.func.id == 'pairs':
+            return self.dump_pairs()
+
+        assert len(self.targets) == 1, f'Forin has {len(self.targets)} targets'
+
         target = self.targets[0]
 
         return f'''
@@ -1084,6 +1106,7 @@ class Call(Statement):
                 '_ceil',
                 '_grow_strings_to',
                 'fillp', 'type', 'mid',
+                'pairs', 'ipairs',
          ]
         _exact_argument_pico8 = [
                 'time', 't', 'dget', 'sget', 'pget', 'shr', 'shl', 'atan2', 'cartdata',

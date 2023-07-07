@@ -84,7 +84,7 @@ assignment
   ;
 
 inplace_op
-  : names (IADD | ISUB | IMUL | IDIV) expr
+  : var[True] (IADD | ISUB | IMUL | IDIV) expr
   ;
 
 local

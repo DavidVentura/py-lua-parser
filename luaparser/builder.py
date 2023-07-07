@@ -586,8 +586,8 @@ class Builder:
 
     def parse_inplace_op(self) -> Assign or bool:
         self.save()
-        names = self.parse_names()
-        if not names:
+        var = self.parse_var()
+        if not var:
             return self.failure()
 
         if not self.next_in_rc([Tokens.IADD, Tokens.ISUB, Tokens.IMUL, Tokens.IDIV]):
@@ -605,7 +605,7 @@ class Builder:
         value = self.parse_expr()
 
         self.success()
-        return IAssign(names, value, iop)
+        return IAssign(var, value, iop)
 
     def parse_assignment(self) -> Assign or bool:
         self.save()

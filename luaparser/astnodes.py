@@ -19,6 +19,7 @@ class InplaceOp(Enum):
     SUB      = auto()
     MUL      = auto()
     DIV      = auto()
+    MOD      = auto()
 
 class Type(Enum):
     BARE_NUMBER     = auto()
@@ -666,6 +667,7 @@ class IAssign(Statement):
                 InplaceOp.SUB: '_minuseq',
                 InplaceOp.MUL: '_muleq',
                 InplaceOp.DIV: '_diveq',
+                InplaceOp.MOD: '_modeq',
                 }
         return f'{_map[self.op]}(&{self.target.dump()}, {self.value.dump()});'
 

@@ -84,7 +84,7 @@ assignment
   ;
 
 inplace_op
-  : var[True] (IADD | ISUB | IMUL | IDIV) expr
+  : var[True] (IADD | ISUB | IMUL | IDIV | IMOD) expr
   ;
 
 local
@@ -291,6 +291,7 @@ IADD      : '+=';
 ISUB      : '-=';
 IMUL      : '*=';
 IDIV      : '/=';
+IMOD      : '%=';
 ADD       : '+';
 MINUS     : '-';
 MULT      : '*';

@@ -70,6 +70,7 @@ class Tokens(enum.Enum):
     ISUB = enum.auto()
     IMUL = enum.auto()
     IDIV = enum.auto()
+    IMOD = enum.auto()
     ADD = enum.auto()
     MINUS = enum.auto()
     MULT = enum.auto()
@@ -146,6 +147,7 @@ LITERAL_NAMES = [
     "'-='",
     "'*='",
     "'/='",
+    "'%='",
     "'-'",
     "'*'",
     "'/'",
@@ -590,7 +592,7 @@ class Builder:
         if not var:
             return self.failure()
 
-        if not self.next_in_rc([Tokens.IADD, Tokens.ISUB, Tokens.IMUL, Tokens.IDIV]):
+        if not self.next_in_rc([Tokens.IADD, Tokens.ISUB, Tokens.IMUL, Tokens.IDIV, Tokens.IMOD]):
             return self.failure()
 
         op = self.type
@@ -602,6 +604,8 @@ class Builder:
             iop = InplaceOp.MUL
         elif op == Tokens.IDIV.value:
             iop = InplaceOp.DIV
+        elif op == Tokens.IMOD.value:
+            iop = InplaceOp.MOD
         value = self.parse_expr()
 
         self.success()

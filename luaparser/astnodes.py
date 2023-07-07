@@ -1034,8 +1034,9 @@ class Forin(Statement):
 
         assert len(self.iter) == 1
         _iter = self.iter[0]
-        if len(self.targets) > 0 and isinstance(_iter, Call) and _iter.func.id == 'pairs':
-            return self.dump_pairs()
+        if len(self.targets) > 0 and isinstance(_iter, Call):
+            if _iter.func.id in ['pairs', 'ipairs']:
+                return self.dump_pairs()
 
         assert len(self.targets) == 1, f'Forin has {len(self.targets)} targets'
 

@@ -238,6 +238,11 @@ class Block(Node):
         self.functions.append(f)
         self.body.insert(0, Signature(f))
 
+    def prepend_child(self, child, new_child):
+        idx = self.body.index(child)
+        new_child.parent = self
+        self.body.insert(idx, new_child)
+
     def replace_child(self, child, new_child):
         idx = self.body.index(child)
         new_child.parent = self
@@ -319,6 +324,9 @@ class Name(Lhs):
         self.id: str = identifier
         self.type = type
 
+    def copy(self):
+        return Name(self.id, self.type)
+
     def children(self):
         return []
 
@@ -385,6 +393,8 @@ class Index(Lhs):
             self.id = idx.id
         self.value.type = Type.TABLE  # anything accessed via a lookup is a table
 
+    def copy(self):
+        return Index(self.idx, self.value, self.notation)
 
     def set_parent_on_children(self):
         self.value.parent = self
@@ -711,6 +721,10 @@ class While(Statement):
         self.test.parent = self
         self.body.parent = self
 
+    def replace_child(self, child, new_child):
+        new_child.parent = self
+        if child == self.test:
+            self.test = child
     def dump(self):
         return f'''
         while (_bool({self.test.dump()})) {{
@@ -860,7 +874,7 @@ class Label(Statement):
         self.id: Name = label_id
 
     def dump(self):
-        raise NotImplementedError()
+        return f'{self.id.dump()}:'
 
 
 class Goto(Statement):
@@ -875,7 +889,7 @@ class Goto(Statement):
         self.label: Name = label
 
     def dump(self):
-        raise NotImplementedError()
+        return f'goto {self.label.dump()};'
 
 
 class SemiColon(Statement):
@@ -1035,6 +1049,9 @@ class Call(Statement):
         self.type = Type.UNKNOWN
         self.set_parent_on_children()
 
+    def copy(self):
+        return Call(self.func, self.args)
+
     def children(self):
         return [self.func] + self.args
 
@@ -1066,14 +1083,16 @@ class Call(Statement):
                 'all',
                 '_ceil',
                 '_grow_strings_to',
+                'fillp', 'type', 'mid',
          ]
         _exact_argument_pico8 = [
-                'time', 'dget', 'sget', 'pget', 'shr', 'shl', 'atan2', 'cartdata',
-                'mget', 'dset', '_draw', '_update', '_update60',
+                'time', 't', 'dget', 'sget', 'pget', 'shr', 'shl', 'atan2', 'cartdata',
+                'mget', 'mset', 'dset', '_draw', '_update', '_update60',
                 'fast_peek', 'fast_peek2', 'fast_peek4',
+                'flip', 'extcmd',
         ]
         _var_arg_pico8 = [
-                'cls', 'spr', 'map', 'btn', 'print', 'cos', 'pal', 'sin', 'palt',
+                'cls', 'spr', 'sspr', 'map', 'btn', 'print', 'cos', 'pal', 'sin', 'palt',
                 'ovalfill', 'oval', 'circ', 'circfill', 'rect', 'rectfill', 'line',
                 'sfx', 'abs', 'min', 'max', 'music', 'fget', 'camera',
                 'btnp', 'rnd', 'sub', 'pset',
@@ -1188,7 +1207,7 @@ class LocalFunction(Function):
     """
 
     def __init__(self, name: Expression, args: List[Expression], body: Block, **kwargs):
-        super(LocalFunction, self).__init__("LocalFunction", **kwargs)
+        super(LocalFunction, self).__init__(name, args, body, **kwargs)
         self.name: Expression = name
         self.args: List[Expression] = args
         self.body: Block = body
@@ -1258,6 +1277,9 @@ class Nil(Expression):
     def __init__(self, **kwargs):
         super(Nil, self).__init__("Nil", **kwargs)
 
+    def copy(self):
+        return Nil()
+
     def children(self):
         return []
 
@@ -1271,6 +1293,9 @@ class TrueExpr(Expression):
     def __init__(self, **kwargs):
         super(TrueExpr, self).__init__("True", **kwargs)
 
+    def copy(self):
+        return TrueExpr()
+
     def children(self):
         return []
 
@@ -1283,6 +1308,9 @@ class FalseExpr(Expression):
 
     def __init__(self, **kwargs):
         super(FalseExpr, self).__init__("False", **kwargs)
+
+    def copy(self):
+        return FalseExpr()
 
     def children(self):
         return []
@@ -1316,6 +1344,9 @@ class Number(Expression):
         self.n: str = n
         self.ntype: NumberType = ntype
         self.nformat = nformat
+
+    def copy(self):
+        return Number(self.n, self.ntype, self.nformat)
 
     def children(self):
         return []
@@ -1362,6 +1393,9 @@ class FunctionReference(Expression):
     def __init__(self, name: Name, **kwargs):
         super(FunctionReference, self).__init__("FunctionReference", **kwargs)
         self.name = name
+    def copy(self):
+        return FunctionReference(self.name)
+
     def dump(self):
         return f"TFUN({self.name.dump()})"
 
@@ -1391,11 +1425,16 @@ class StringRef(Expression):
         for bad in string.punctuation + string.whitespace:
             name = name.replace(bad, "_")
         name = name.replace("❎", "_X_")
+        name = name.replace("🅾️)", "_O_")
         name = name.replace("⬅️", "_left_")
         name = name.replace("➡️", "_right_")
         name = name.replace("⬆️", "_up_")
         name = name.replace("⬇️", "_down_")
         name = name.replace("♪", "_music_")
+        good = string.ascii_letters + string.digits
+        for letter in name:
+            if letter not in good:
+                name = name.replace(letter, "_")
         name = name[:32]
         varname = f'__str_{name}'
         return varname
@@ -1421,6 +1460,9 @@ class String(Expression):
         super(String, self).__init__("String", **kwargs)
         self.s: str = s
         self.delimiter: StringDelimiter = delimiter
+
+    def copy(self):
+        return String(self.s, self.delimiter)
 
     def children(self):
         return []
@@ -1477,6 +1519,9 @@ class Table(Expression):
         self.field_names = list({f.key.dump() for f in self.fields})
         self.set_parent_on_children()
 
+
+    def copy(self):
+        return Table(self.fields)
 
     def dump(self):
         return f'TTAB(make_table({len(self.field_names)}))'
@@ -1561,6 +1606,9 @@ class BinaryOp(Op):
 class AriOp(BinaryOp):
     """Base class for Arithmetic Operators"""
     type = Type.NUMBER
+
+    def copy(self):
+        return self.__class__(self.left, self.right)
 
 class AddOp(AriOp):
     """Add expression.
@@ -1855,6 +1903,8 @@ class NotEqToOp(RelOp):
 
 class LoOp(BinaryOp):
     """Base class for logical operators."""
+    def copy(self):
+        return self.__class__(self.left, self.right)
 
 
 class AndLoOp(LoOp):
@@ -1933,6 +1983,9 @@ class UnaryOp(Expression):
 
     def children(self):
         return [self.operand]
+    
+    def copy(self):
+        return self.__class__(self.operand)
 
 
 class UMinusOp(UnaryOp):

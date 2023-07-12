@@ -222,10 +222,9 @@ class Block(Node):
     def __init__(self, body: List[Statement], **kwargs):
         super().__init__("Block", **kwargs)
         self.body: List[Statement] = body
-        for s in body:
-            s.parent = self
         self.functions: List[Function] = []
         self.vars: List = []
+        self.set_parent_on_children()
 
     def dump(self):
         return '\n'.join(s.dump() for s in self.body)
@@ -257,6 +256,12 @@ class Block(Node):
         for new_child in new_children[:-1:-1]: # go backwards, skip the last child
             self.body.insert(idx, new_child)
             self.body[idx-1].parent = self
+
+    def set_parent_on_children(self):
+        for s in self.body:
+            s.parent = self
+        for f in self.functions:
+            f.parent = self
 
 
 class Signature(Node):
@@ -291,7 +296,10 @@ class Chunk(Node):
     def __init__(self, body: Block, **kwargs):
         super(Chunk, self).__init__("Chunk", **kwargs)
         self.body = body
-        body.parent = self
+        self.set_parent_on_children()
+
+    def set_parent_on_children(self):
+        self.body.parent = self
 
     def dump(self):
         pass
@@ -355,8 +363,11 @@ class ArrayIndex(Lhs):
     ):
         super(ArrayIndex, self).__init__("ArrayIndex", **kwargs)
         self.idx = idx
-        self.value: Expression = value
+        self.value = value
         self.set_parent_on_children()
+
+    def copy(self):
+        return ArrayIndex(self.idx, self.value)
 
     def set_parent_on_children(self):
         self.idx.parent = self
@@ -988,12 +999,28 @@ class Fornum(Statement):
         self.stop: Expression = stop
         self.step: Expression = step
         self.body: Block = body
+        self.set_parent_on_children()
 
+    def set_parent_on_children(self):
         self.target.parent = self
         self.start.parent = self
         self.stop.parent = self
         self.step.parent = self
         self.body.parent = self
+
+    def replace_child(self, child, new_child):
+        new_child.parent = self
+        #if self.target == child:
+        #    self.target = new_child
+        if self.start == child:
+            self.start = new_child
+        if self.stop == child:
+            self.stop = new_child
+        if self.step == child:
+            self.step = new_child
+
+    def add_declaration(self, n: Node, is_local: bool):
+        self.body.body.insert(0, Declaration(n, Type.UNKNOWN, is_local))
 
     def dump(self):
         return f'''
@@ -1208,18 +1235,32 @@ class Function(Statement):
         body (`Block`): List of statements to execute.
     """
 
-    def __init__(self, name: Expression, args: List[Expression], body: Block, is_dyncalled=False, **kwargs):
+    def __init__(self, name: Expression, args: List[Expression], body: Block, environment: Optional[Name] = None, is_dyncalled=False, **kwargs):
         super(Function, self).__init__("Function", **kwargs)
         self.name: Expression = name
         self.args: List[Expression] = args
         self.body: Block = body
         self.is_dyncalled = is_dyncalled
+        self.environment = environment
 
+        self.ret_type = Type.NULL
+        self.set_parent_on_children()
+
+    def replace_child(self, child, new_child, replace_args=False):
+        new_child.parent = self
+        if replace_args:
+            for arg in self.args:
+                if arg == child:
+                    idx = self.args.index(child)
+                    self.args[idx] = new_child
+        if self.name == child:
+            self.name = new_child
+
+    def set_parent_on_children(self):
         for a in self.args:
             a.parent = self
-
+        self.name.parent = self
         self.body.parent = self
-        self.ret_type = Type.NULL
 
     @property
     def signature(self):
@@ -1530,6 +1571,19 @@ class Field(Expression):
         self.key: Expression = key
         self.value: Expression = value
         self.between_brackets: bool = between_brackets
+        self.set_parent_on_children()
+
+    def replace_child(self, child, new_child):
+        new_child.parent = self
+        if self.key == child:
+            self.key = new_child
+        if self.value == child:
+            self.value = new_child
+
+    def set_parent_on_children(self):
+        if self.key:
+            self.key.parent = self
+        self.value.parent = self
 
     def dump(self):
         if isinstance(self.key, (Name, String, Number)):
@@ -1551,13 +1605,13 @@ class Table(Expression):
     def __init__(self, fields: List[Field], **kwargs):
         super().__init__("Table", **kwargs)
         self.fields: List[Field] = fields
-        for f in self.fields:
-            f.key.parent = self
-            f.value.parent = self
-
         self.field_names = list({f.key.dump() for f in self.fields})
         self.set_parent_on_children()
 
+
+    def set_parent_on_children(self):
+        for f in self.fields:
+            f.parent = self
 
     def copy(self):
         return Table(self.fields)
@@ -1594,6 +1648,21 @@ class AnonymousFunction(Expression):
         super(AnonymousFunction, self).__init__("AnonymousFunction", **kwargs)
         self.args: List[Expression] = args
         self.body: Block = body
+
+    def replace_child(self, child, new_child, replace_args=False):
+        new_child.parent = self
+        if replace_args:
+            for arg in self.args:
+                if arg == child:
+                    idx = self.args.index(child)
+                    self.args[idx] = new_child
+
+    def set_parent_on_children(self):
+        for a in self.args:
+            a.parent = self
+        self.body.parent = self
+        if self.environment:
+            self.environment.parent = self
 
     def dump(self):
         assert False, "Should never call dump() on AnonymousFunction"
@@ -1849,6 +1918,9 @@ class RelOp(BinaryOp):
     def dump(self):
         return f'{self.OP}({self.left.dump()}, {self.right.dump()})'
 
+    def copy(self):
+        return self.__class__(self.left, self.right)
+
     def replace_child(self, child, new_child):
         new_child.parent = self
         if child == self.left:
@@ -2023,6 +2095,10 @@ class UnaryOp(Expression):
     def children(self):
         return [self.operand]
     
+    def replace_child(self, child, new_child):
+        new_child.parent = self
+        if self.operand == child:
+            self.operand = new_child
     def copy(self):
         return self.__class__(self.operand)
 

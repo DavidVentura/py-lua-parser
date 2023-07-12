@@ -1057,7 +1057,12 @@ class Forin(Statement):
 
     def dump_pairs(self):
         var_a = self.targets[0]
-        var_b = self.targets[1]
+        if len(self.targets) > 1:
+            var_b = self.targets[1]
+            assign_var_b = f'TValue_t {var_b.dump()} = _pairs_iterator[__i].value;'
+        else:
+            assign_var_b = ''
+
         _iter = self.iter[0]
         return f'''
         {{
@@ -1065,7 +1070,7 @@ class Forin(Statement):
             uint16_t __i = 0;
             while(_pairs_iterator[__i].key.tag != NUL) {{
                 TValue_t {var_a.dump()} = _pairs_iterator[__i].key;
-                TValue_t {var_b.dump()} = _pairs_iterator[__i].value;
+                {assign_var_b}
                 {self.body.dump()}
                 __i++;
             }}

@@ -1152,27 +1152,31 @@ class Call(Statement):
                 'getmetatable', 'setmetatable',
                 'tostring',
                 '_and', '_or',
-                'cos', 'sin', 'abs', '_sqr', '_sqrt', 'flr',
-                'all',
+                '_cos', '_sin', '_abs', '_atan2', '_sqrt', 'flr',
+                'all','shr', 'shl', 
                 '_ceil',
                 '_grow_strings_to',
-                'fillp', 'type', 'mid',
+                'type', 'mid',
                 'pairs', 'ipairs',
          ]
+        _var_arg_builtins = [
+            'count', 'sgn', '_min', '_max', 'rnd', 'deli', 'sub',
+        ]
         _exact_argument_pico8 = [
-                'time', 't', 'dget', 'sget', 'pget', 'shr', 'shl', 'atan2', 'cartdata',
+                '_time', 't', 'dget', 'sget', 'pget', 'cartdata',
                 'mget', 'mset', 'dset', '_draw', '_update', '_update60',
                 'fast_peek', 'fast_peek2', 'fast_peek4',
                 'flip', 'extcmd',
         ]
         _var_arg_pico8 = [
-                'cls', 'spr', 'sspr', 'map', 'btn', 'print', 'cos', 'pal', 'sin', 'palt',
+                'cls', 'spr', 'sspr', 'map', 'btn', 'print', 'pal', 'palt',
                 'ovalfill', 'oval', 'circ', 'circfill', 'rect', 'rectfill', 'line',
-                'sfx', 'abs', 'min', 'max', 'music', 'fget', 'camera',
-                'btnp', 'rnd', 'sub', 'pset',
+                'sfx', 'music', 'fget', 'camera',
+                'btnp', 'pset',
                 'poke', 'poke2', 'poke4',
                 'peek', 'peek2', 'peek4',
-                'sgn', 'color', 'count',
+                'color', 'fillp',
+                'menuitem', 'reload',
         ]
 
         _bad = set(_exact_argument_pico8).intersection(set(_var_arg_pico8))

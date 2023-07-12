@@ -1470,13 +1470,17 @@ class StringDelimiter(Enum):
 
 class FunctionReference(Expression):
     type = Type.FUNCTION
-    def __init__(self, name: Name, **kwargs):
+    def __init__(self, name: Name, environment: Optional[Name] = None, **kwargs):
         super(FunctionReference, self).__init__("FunctionReference", **kwargs)
         self.name = name
+        self.environment = environment
+
     def copy(self):
         return FunctionReference(self.name)
 
     def dump(self):
+        if self.environment is not None:
+            return f"TCLOSURE({self.name.dump()}, {self.environment.dump()})"
         return f"TFUN({self.name.dump()})"
 
 
@@ -1644,10 +1648,12 @@ class AnonymousFunction(Expression):
         body (`Block`): List of statements to execute.
     """
 
-    def __init__(self, args: List[Expression], body: Block, **kwargs):
+    def __init__(self, args: List[Expression], body: Block, environment: Optional[Name] = None, **kwargs):
         super(AnonymousFunction, self).__init__("AnonymousFunction", **kwargs)
         self.args: List[Expression] = args
         self.body: Block = body
+        self.environment = environment
+        self.set_parent_on_children()
 
     def replace_child(self, child, new_child, replace_args=False):
         new_child.parent = self

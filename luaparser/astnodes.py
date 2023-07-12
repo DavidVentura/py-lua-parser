@@ -798,7 +798,24 @@ class ElseIf(Statement):
         assert False
 
     def dump(self):
-        raise NotImplementedError()
+        cond_arm = f'''
+        else if (_bool({self.test.dump()})) {{
+        {self.body.dump()}
+        }}'''
+
+        if isinstance(self.orelse, ElseIf):
+            else_arm = self.orelse.dump()
+        else:
+            # no else arm
+            if self.orelse is None or len(self.orelse.body) == 0:
+                else_arm = ''
+            else:
+                stmts = '\n'.join(s.dump() for s in self.orelse.body)
+                else_arm = f'''
+                else {{
+                    {stmts}
+                }}'''
+        return cond_arm + else_arm
 
     def add_declaration(self, n: Node, is_local: bool):
         self.body.body.insert(0, Declaration(n, Type.UNKNOWN, is_local))
@@ -834,11 +851,9 @@ class If(Statement):
         if (_bool({self.test.dump()})) {{
         {self.body.dump()}
         }}'''
+
         if isinstance(self.orelse, ElseIf):
-            else_arm = f'''else if (_bool({self.orelse.test.dump()})) {{
-            {self.orelse.body.dump()}
-            }}
-            '''
+            else_arm = self.orelse.dump()
         else:
             # no else arm
             if self.orelse is None or len(self.orelse.body) == 0:

@@ -762,7 +762,11 @@ class Do(Statement):
         self.body.parent = self
 
     def dump(self):
-        raise NotImplementedError()
+        return f'''
+        {{
+            {self.body.dump()}
+        }}
+        '''
 
 
 class Repeat(Statement):

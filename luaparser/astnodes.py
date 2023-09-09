@@ -2177,4 +2177,4 @@ class ULengthOP(UnaryOp):
         super().__init__("ULengthOp", operand, **kwargs)
 
     def dump(self):
-        return f'/* _length() */'
+        return f'_length({self.operand.dump()})'

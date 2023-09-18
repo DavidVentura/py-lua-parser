@@ -180,7 +180,12 @@ class Node:
         if isinstance(self.parent, Block) and isinstance(self.parent.parent, Fornum):
             # All Blocks should work, but there's some fuckery
             return self.parent
-        if isinstance(self.parent, (If)):
+        if isinstance(self.parent, (If, ElseIf)):
+            return self.parent
+        # ElseIf is sometimes just a `If -> Block`
+        if isinstance(self.parent, Block)  and isinstance(self.parent.parent, (If, ElseIf)):
+            return self.parent
+        if isinstance(self.parent, (Fornum, Forin)):
             return self.parent
 
         return self.parent.scope()

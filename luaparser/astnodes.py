@@ -979,7 +979,7 @@ class Return(Statement):
         if len(self.values) == 1:
             ret = ''
             if isinstance(self.values[0], Name):
-                ret += f'_incref({self.values[0].dump()});'
+                ret += f'_mark_for_gc({self.values[0].dump()});'
             ret += f'return {self.values[0].dump()};'
             return ret
 
@@ -1168,6 +1168,7 @@ class Call(Statement):
                 '_grow_strings_to',
                 'type', 'mid',
                 'pairs', 'ipairs',
+                'run_gc',
          ]
         _var_arg_builtins = [
             'count', 'sgn', '_min', '_max', 'rnd', 'deli', 'sub',

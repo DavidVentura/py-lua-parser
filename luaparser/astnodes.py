@@ -835,10 +835,10 @@ class ElseIf(Statement):
             if self.orelse is None or len(self.orelse.body) == 0:
                 else_arm = ''
             else:
-                stmts = '\n'.join(s.dump() for s in self.orelse.body)
+                # stmts = '\n'.join(s.dump() for s in self.orelse.body)
                 else_arm = f'''
                 else {{
-                    {stmts}
+                    {self.orelse.dump()}
                 }}'''
         return cond_arm + else_arm
 
@@ -884,10 +884,9 @@ class If(Statement):
             if self.orelse is None or len(self.orelse.body) == 0:
                 else_arm = ''
             else:
-                stmts = '\n'.join(s.dump() for s in self.orelse.body)
                 else_arm = f'''
                 else {{
-                    {stmts}
+                    {self.orelse.dump()}
                 }}'''
         return cond_arm + else_arm
 
